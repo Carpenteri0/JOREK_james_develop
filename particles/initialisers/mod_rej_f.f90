@@ -20,8 +20,10 @@
 module mod_rej_f
     use equil_info       ! (R_axis,Z_axis), etc..
     use mod_model_settings
+    use mpi
 
     implicit none
+    integer :: ierr ! mpi error code
     private
 
     public :: spatial_pdf
@@ -108,7 +110,7 @@ module mod_rej_f
             if (var_zj == 0) then
                 write(*,*) "ERROR (mod_rej_f): 'current' spatial PDF requires model"
                 write(*,*) "  with var_zj > 0. j_tor is not a stored variable in this model"
-                stop 1
+                call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
             endif
             pdf%f    => current_pdf
             pdf%vars =  [-1, var_zj]
@@ -122,7 +124,7 @@ module mod_rej_f
             write(*,*) "ERROR (mod_rej_f): Unknown spatial PDF name '", trim(name), "'"
             write(*,*) "      Valid names: 'itpa_tae', 'RZ', 'analytical', "
             write(*,*) "                   'current', 'none'"
-            stop 1
+            call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
         end select
     end function spatial_pdf_from_name
 

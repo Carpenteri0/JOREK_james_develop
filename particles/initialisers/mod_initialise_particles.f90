@@ -32,7 +32,7 @@ module mod_initialise_particles
 
   implicit none
   integer :: ierr !> mpi error code
-  
+
   contains
 
   !> Top-level initialisation loop over all particle groups
@@ -131,7 +131,7 @@ module mod_initialise_particles
       inquire(file="experimental_dist.h5", exist=exists)
       if (.not. exists) then
         if (sim%my_id == 0) write(*,*) "ERROR (initialise_group): init_function='experimental' requires 'experimental_dist.h5' file in working directory"
-        stop 1
+        call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
       endif
 
       call import_particles(sim%groups(group_num)%particles, sim%fields, &
@@ -162,7 +162,7 @@ module mod_initialise_particles
           trim(config%init_function), "' for group '", trim(config%id), "'"
         write(*,*) "  Valid init_functions: 'maxwell', 'gaussian_re', 'experimental'"
       endif
-      stop 1
+      call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
     
     end select
 
