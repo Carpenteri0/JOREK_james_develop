@@ -6,6 +6,7 @@ module initialisers_base
   use mod_particle_types
   use constants
   use mod_interp
+  use mod_rej_f
   implicit none
   private
   public initialise_particles, no_transform, adjust_particle_weights
@@ -26,13 +27,6 @@ module initialisers_base
       integer, intent(inout) :: ielm_out
       integer, intent(out)   :: ifail
     end subroutine find_RZ
-    function rej_f(n, P, gradP)
-      implicit none
-      integer, intent(in) :: n
-      real*8, dimension(n), intent(in) :: P
-      real*8, dimension(3,n), intent(in) :: gradP
-      real*4 :: rej_f
-    end function rej_f
     function real_f(n_x,x,st,time,i_elm,fields,x_min,x_max,&
     n_real_param,real_param,n_int_param,int_param)
       use mod_fields, only: fields_base
@@ -101,18 +95,19 @@ subroutine initialise_particles(particles, node_list, element_list, &
   class(particle_base), dimension(:), intent(inout) :: particles
   type(type_node_list), intent(in)                  :: node_list
   type(type_element_list), intent(in)               :: element_list
-  class(type_rng), intent(in)                       :: rng !< What type of random number generator to use. Is re-seeded in the subroutine.
+  class(type_rng), intent(in)                       :: rng       !< What type of random number generator to use. Is re-seeded in the subroutine.
   integer, dimension(:), intent(in), optional       :: variables !< Which variables from JOREK to use. If absent, sample uniformly.
-  real*8, external, optional                        :: transform !< Merge variables into a single criterium between 0 and 1 for rej.  sampling
-  !< Special values: 0 = 1, -1 = R, -2 = Z, -3 = Phi. Must be in ascending order!
-  real*8, intent(in), optional                      :: f !< Weighting factor: f=0 indicates uniform weights, f=1 indicates uniform distribution
-  !< (particle weight proportional to transform(P) at that point.) If omitted take f=0.
-  real*8, dimension(2), intent(in), optional        :: Rbound, Zbound, Phibound !< Between which coordinates to sample (RZPhi).
-  !< if omitted, determine automatically from node_list
+  procedure(rej_f), optional                        :: transform !< Merge variables into a single criterium between 0 and 1 for rej.  sampling
+                                                                 !< Special values: 0 = 1, -1 = R, -2 = Z, -3 = Phi. Must be in ascending order!
+  real*8, intent(in), optional                      :: f         !< Weighting factor: f=0 indicates uniform weights, f=1 indicates uniform distribution
+                                                                 !< (particle weight proportional to transform(P) at that point.) If omitted take f=0.
+  real*8, dimension(2), intent(in), optional        :: Rbound, Zbound, Phibound   !< Between which coordinates to sample (RZPhi).
+                                                                                  !< if omitted, determine automatically from node_list
   logical, intent(in), optional                     :: rng_n_streams_round_off_in !< round-off the rng n_streams at 2**ceil
 
   ! Internal variables
   real*8  :: R, Z, phi, s, t, DUMMY_REAL
+  real*8  :: R_i, R_s, R_t, Z_i, Z_s, Z_t, xjac
   real*8  :: Rbox(2), Zbox(2), Phibox(2)
   integer :: i, j, k, ifail
   real*8  :: ran(7)
@@ -123,10 +118,11 @@ subroutine initialise_particles(particles, node_list, element_list, &
   integer :: my_id, n_mpi
   integer :: seed
   logical :: rng_n_streams_round_off
-  real*8, dimension(:), allocatable :: P
+  real*8, dimension(:), allocatable          :: P
+  real*8, dimension(:,:), allocatable        :: gradP
   class(type_rng), allocatable, dimension(:) :: rngs ! The RNGs for all the threads
-  integer, dimension(:), allocatable :: i_to_find
-  logical, dimension(:), allocatable :: not_found
+  integer, dimension(:), allocatable         :: i_to_find
+  logical, dimension(:), allocatable         :: not_found
 
   ostart = 0.d0
   oend   = 0.d0
@@ -142,6 +138,8 @@ subroutine initialise_particles(particles, node_list, element_list, &
     end if
     ! Get the number of mhd variables to use
     allocate(P(size(variables,1)))
+    allocate(gradP(3, size(variables,1)))
+    gradP = 0.d0
     n_mhd = count(variables .gt. 0)
     n_geom = size(variables, 1) - n_mhd
   else
@@ -217,7 +215,8 @@ subroutine initialise_particles(particles, node_list, element_list, &
 #endif
     !$omp   shared(particles, node_list, element_list, Rbox, Zbox, PhiBox, variables, &
     !$omp          rngs, n_threads, n_streams, seed, my_id, n_mhd, n_geom, i_to_find, not_found) &
-    !$omp   private(j, i, R, Z, phi, i_elm, s, t, ifail, seq, ran, i_thread, P, DUMMY_REAL)
+    !$omp   private(j, i, R, Z, phi, i_elm, s, t, ifail, seq, ran, i_thread, P, DUMMY_REAL, gradP, &
+    !$omp           R_i, R_s, R_t, Z_i, Z_s, Z_t, xjac)
     i_thread = 0
 !$  i_thread=omp_get_thread_num()
     !$omp do schedule(static)
@@ -232,19 +231,30 @@ subroutine initialise_particles(particles, node_list, element_list, &
         if (present(variables)) then
           ! Select the mhd variables requested
           if (n_mhd .ge. 1) then
-            call interp_0(node_list,element_list,i_elm,variables(n_geom+1:n_geom+n_mhd),n_mhd,s,t,phi,P(n_geom+1:n_geom+n_mhd))
+            call interp_PRZ(node_list, element_list, i_elm, variables(n_geom+1:n_geom+n_mhd), &
+            n_mhd, s, t, phi, P(n_geom+1:n_geom+n_mhd), gradP(1, n_geom+1:n_geom+n_mhd),      &
+            gradP(2, n_geom+1:n_geom+n_mhd), gradP(3, n_geom+1:n_geom+n_mhd), R_i, R_s, R_t,  &
+            Z_i, Z_s, Z_t)
+
+            !> Calculate R/Z derivs for gradP if needed by the rej_f (interp_PRZ gives s, t derivs)
+            xjac = R_s*Z_t - R_t*Z_s
+            do k = 1, n_mhd
+              gradP(1:2,n_geom+k) = [Z_t*gradP(1,n_geom+k) - Z_s*gradP(2,n_geom+k), &
+                                     R_s*gradP(2,n_geom+k) - R_t*gradP(1,n_geom+k)]/xjac
+            enddo
           end if
+
           do k=1,n_geom
             select case (variables(k))
-              case (0);  P(k) = 1.d0
-              case (-1); P(k) = R
-              case (-2); P(k) = Z
-              case (-3); P(k) = phi
+              case (0);  P(k) = 1.d0 ; gradP(:,k) = 0.d0               ! 0
+              case (-1); P(k) = R    ; gradP(:,k) = [1.d0, 0.d0, 0.d0] ! R
+              case (-2); P(k) = Z    ; gradP(:,k) = [0.d0, 1.d0, 0.d0] ! Z
+              case (-3); P(k) = phi  ; gradP(:,k) = [0.d0, 0.d0, 1.d0] ! phi
             end select
           end do
 
           if (present(transform)) then
-            if (ran(4) .lt. transform(p)) then
+            if (ran(4) .lt. transform(size(p,1), p, gradP)) then
               particles(j)%x = [R, Z, phi]
               particles(j)%i_elm = i_elm
               particles(j)%st = [s, t]
@@ -274,6 +284,11 @@ subroutine initialise_particles(particles, node_list, element_list, &
     deallocate(not_found); allocate(not_found(size(i_to_find,1)))
     not_found = .true.
   end do
+
+  if (present(variables)) then
+    deallocate(P)
+    deallocate(gradP)
+  endif
 
   call cpu_time(t1)
 !$ oend = omp_get_wtime()
