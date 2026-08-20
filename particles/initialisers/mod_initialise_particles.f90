@@ -49,7 +49,7 @@ module mod_initialise_particles
       j = matching_part_config_indices(i) ! get the matching part_group_config index
 
       select case(trim(part_group_configs(j)%coupling_scheme))
-      case('ics', 'ncs')
+      case('ics', 'ncs', 'non')
         if (sim%my_id == 0) then
           write(*,*) "Particle initialisation skipped for ics/ncs, particles are born elsewhere"
         endif
