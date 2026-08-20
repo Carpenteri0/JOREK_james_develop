@@ -191,8 +191,7 @@ module mod_rej_f
         real*8            :: minor_r
 
         minor_r = sqrt((P(1) - ES%Z_axis)**2 + (P(2) - ES%R_axis)**2)
-        f = real((1.d0 - (minor_r/ES%LCFS_a)**2)**nu, 4)
-        f = max(f, 0.0e0)  !> clamp outside LCFS
+        f = real(max(1.d0 - (minor_r/ES%LCFS_a)**2, 0.d0)**nu, 4)
     end function analytical_pdf
 
     !> Weight proportional to normalised toroidal current density j_tor
