@@ -23,13 +23,12 @@ module mod_rej_f
     use mpi
 
     implicit none
-    integer :: ierr ! mpi error code
     private
 
     public :: spatial_pdf
     public :: rej_f
     public :: itpa_tae_pdf, RZ_pdf, analytical_pdf, current_pdf
-    public :: spatial_pdf_from_name
+    public :: spatial_pdf_from_name, check_spatial_pdf
 
     ! =============================================================================
     ! Interface
@@ -39,10 +38,13 @@ module mod_rej_f
     !>
     !> @param n     Number of field values in P and gradP
     !> @param P     Field values at the sample point, ordered as vars(:)
-    !> @param gradP Gradients (3,n); may be unused
+    !> @param gradP (3,n) = (d/dR, d/dZ, d/dphi) of each entry of P.
+    !>              Only computed when needs_grad = .true.; zero otherwise.
     !> @return      Acceptance probability in [0,1]
+    !>
+    !> Must be pure : it is called from inside the OpenMP sampling loops.
     abstract interface
-        function rej_f(n, P, gradP)
+        pure function rej_f(n, P, gradP)
             implicit none
             integer,                intent(in) :: n
             real*8, dimension(n),   intent(in) :: P
@@ -65,11 +67,13 @@ module mod_rej_f
     !> Example (custom profile)
     !>
     !>      type(spatial_pdf) :: pdf
-    !>      pdf%f    => my_rej_function
-    !>      pdf%vars = [var_psi, -1] ! psi and R
+    !>      pdf%f          => my_rej_function
+    !>      pdf%vars       = [var_psi, -1]   ! psi and R
+    !>      pdf%needs_grad = .true.          ! only if my_rej_function requires gradP
     type :: spatial_pdf
         procedure(rej_f), nopass, pointer :: f => null()
         integer,          allocatable     :: vars(:)
+        logical                           :: needs_grad = .false. !> Does f require gradients of any vars?
     end type spatial_pdf
     
 
@@ -86,23 +90,35 @@ module mod_rej_f
     !>    'analytical'      - weight by (1-(r/a)^2)^nu
     !>    'current'         - weight by normalised j_tor
     !>    'none'            - no rejection (f => null, vars unallocated)
-    function spatial_pdf_from_name(name) result(pdf)
-        character(len=*), intent(in) :: name
-        type(spatial_pdf)            :: pdf
+    !>
+    !> node_list/element_list are the equilibrium the pdf is calibrated against.
+    !> only 'current' uses them at the moment, but any profile normalised to 
+    !> equilibrium fields will need them
+    function spatial_pdf_from_name(name, node_list, element_list) result(pdf)
+        character(len=*),        intent(in) :: name
+        type(type_node_list),    intent(in) :: node_list
+        type(type_element_list), intent(in) :: element_list
+        type(spatial_pdf)                   :: pdf
+
+        integer :: ierr
 
         select case(trim(name))
 
         case('itpa_tae')
-            pdf%f    => itpa_tae_pdf
-            pdf%vars =  [var_psi]
+            pdf%f          => itpa_tae_pdf
+            pdf%vars       =  [var_psi]
+            pdf%needs_grad = .false.
         
         case('RZ')
-            pdf%f    => RZ_pdf
-            pdf%vars =  [-2, -1]
+            pdf%f          => RZ_pdf
+            pdf%vars       =  [-2, -1]
+            pdf%needs_grad = .false.
 
         case('analytical')
-            pdf%f    => analytical_pdf
-            pdf%vars =  [-2, -1]
+            pdf%f          => analytical_pdf
+            pdf%vars       =  [-2, -1]
+            pdf%needs_grad = .false.
+
 
         case('current')
             !> NOTE : var_zj = 0 in fullMHD (j_tor is not a stored variable)
@@ -112,8 +128,10 @@ module mod_rej_f
                 write(*,*) "  with var_zj > 0. j_tor is not a stored variable in this model"
                 call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
             endif
-            pdf%f    => current_pdf
-            pdf%vars =  [-1, var_zj]
+            pdf%f          => current_pdf
+            pdf%vars       =  [-1, var_zj]
+            pdf%needs_grad = .false.
+
 
         case('none')
             !> Leave f => null() and vars unallocated

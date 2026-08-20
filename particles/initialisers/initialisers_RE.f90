@@ -34,14 +34,8 @@ subroutine initialise_re_gaussian(sim, group_num, rng, space_pdf, energy, pitch,
   integer                                             :: num_part
   real*8,               allocatable                   :: ran_uniform(:), ran_gaussian(:)
 
-  if (present(space_pdf)) then
-    call initialise_particles(sim%groups(group_num)%particles, &
-      sim%fields%node_list, sim%fields%element_list, rng,      &
-      variables=space_pdf%vars, transform=space_pdf%f)
-  else
-    call initialise_particles(sim%groups(group_num)%particles, &
-      sim%fields%node_list, sim%fields%element_list, rng)
-  endif
+  call initialise_particles(sim%groups(group_num)%particles, &
+    sim%fields%node_list, sim%fields%element_list, rng, space_pdf)
 
   num_part = size(sim%groups(group_num)%particles,1) 
 

@@ -111,20 +111,11 @@ module mod_initialise_particles
         write(*, '(A,I0)')       "  n_phi_planes : ", config%n_phi_planes
       endif
 
-      if (associated(space_pdf%f)) then
-        call initialise_particles_H_mu_psi_phiplanes(               &
-          sim%groups(group_num)%particles, sim%fields, pcg32_rng(), &
-          sim%groups(group_num)%mass, uniform_space=.true.,         & 
-          uniform_space_rej_f=space_pdf%f,                          &
-          uniform_space_rej_vars=space_pdf%vars, charge=1,          &
-          T_maxwell=config%T_maxwell, n_phi_planes_in=config%n_phi_planes)
-      else
-        call initialise_particles_H_mu_psi_phiplanes(               &
-          sim%groups(group_num)%particles, sim%fields, pcg32_rng(), &
-          sim%groups(group_num)%mass, uniform_space=.true.,         &
-          charge=1, T_maxwell=config%T_maxwell,                     &
-          n_phi_planes_in=config%n_phi_planes)
-      endif
+      call initialise_particles_H_mu_psi_phiplanes(               &
+        sim%groups(group_num)%particles, sim%fields, pcg32_rng(), &
+        sim%groups(group_num)%mass, uniform_space=.true.,         & 
+        space_pdf=space_pdf, charge=1,                            &
+        T_maxwell=config%T_maxwell, n_phi_planes_in=config%n_phi_planes)
 
     !> EPs : experimental distribution - f(R,Z,energy,pitch), expects a .h5 file - see mod_import_experimental_dist
     case ('experimental')
@@ -150,13 +141,8 @@ module mod_initialise_particles
         write(*,'(A,ES12.3)')   "  Pitch  : ", config%re_pitch
       endif
 
-      if (associated(space_pdf%f)) then
-        call initialise_re_gaussian(sim, group_num, pcg32_rng(), &
-          space_pdf, config%re_energy, config%re_pitch, config%re_std_energy)
-      else
-        call initialise_re_gaussian(sim, group_num, pcg32_rng(), &
-          energy=config%re_energy, pitch=config%re_pitch, std_energy=config%re_std_energy)
-      endif
+      call initialise_re_gaussian(sim, group_num, pcg32_rng(), &
+        space_pdf, config%re_energy, config%re_pitch, config%re_std_energy)
 
     !> Unknown init functions
     case default
