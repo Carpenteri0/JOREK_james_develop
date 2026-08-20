@@ -50,6 +50,7 @@ subroutine check_compatibility_and_determine_coupling_schemes()
       case ('rep')
         call check_no_epf_params(group_num)
         call check_no_ics_ncs_params(group_num)
+        call check_compatibility_rep(group_num)
         use_rep = .true.
       case ('epc')
         write(*,*) "ERROR: coupling scheme 'epc' is not yet implemented"
@@ -123,6 +124,36 @@ subroutine check_compatibility_ics(group_num)
   endif
 
 end subroutine check_compatibility_ics
+
+subroutine check_compatibility_rep(group_num)
+  implicit none
+  integer :: group_num
+
+  !> Check initialisation parameters
+  if (trim(part_group_configs(group_num)%init_function) .eq. 're_gaussian') then
+    if (part_group_configs(group_num)%re_energy .eq. 0.d0) then
+      write(*,*) "ERROR: re_gaussian initialisation chosen, but no energy supplied"
+      write(*,*) "  please set part_group_configs()%re_energy"
+      call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+    endif
+    if (part_group_configs(group_num)%re_std_energy .eq. 0) then
+      write(*,*) "ERROR: re_gaussian initialisation chosen, but re_std_energy = 0"
+      write(*,*) "  please set part_group_configs()%re_std_energy"
+      call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+    endif
+    if (part_group_configs(group_num)%re_pitch .eq. 0) then
+      write(*,*) "ERROR: re_gaussian initialisation chosen, but re_pitch = 0"
+      write(*,*) "  please set part_group_configs()%re_pitch"
+      call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+    endif
+  endif
+  if (part_group_configs(group_num)%n_particles_total .eq. 0.d0) then
+    write(*,*) "ERROR: n_particles_total = 0, this is how weights are set"
+    write(*,*) "  please set part_group_configs()%n_particles_total"
+    call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+  endif
+
+end subroutine check_compatibility_rep
 
 subroutine check_compatibility_epf(group_num)
   implicit none

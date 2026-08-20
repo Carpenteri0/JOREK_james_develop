@@ -15,7 +15,7 @@ module initialisers_RE
   implicit none
 
   contains
-subroutine initialise_gaussian_re(sim, group_num, rng, space_pdf, energy, pitch, std_energy)
+subroutine initialise_re_gaussian(sim, group_num, rng, space_pdf, energy, pitch, std_energy)
   use phys_module, only: tstep_particles
   use mod_kinetic_relativistic
   use mod_sampling, only: boxmueller_transform
@@ -101,6 +101,6 @@ subroutine initialise_gaussian_re(sim, group_num, rng, space_pdf, energy, pitch,
   deallocate(p_par)
   deallocate(p_perp)
 
-end subroutine initialise_gaussian_re
+end subroutine initialise_re_gaussian
 
 end module initialisers_RE

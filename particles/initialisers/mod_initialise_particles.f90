@@ -13,7 +13,7 @@
 !> Valid init_functions:
 !>   'maxwell'      -> Maxwellian Energy distribution, uniform pitch. Spatial dist set by init_pdf (or uniform if no init_pdf specified)
 !>                     Temperature specified by T_maxwell in input file. Only valid for particle_kinetic_leapfrog
-!>   'gaussian_re'  -> Monoenergetic or Gaussian energy distribution, delta function in pitch.
+!>   're_gaussian'  -> Monoenergetic or Gaussian energy distribution, delta function in pitch.
 !>                     Spatial dist set by init_pdf (or uniform if no init_pdf specified)
 !>                     re_energy, re_std_energy, re_pitch specified in input file. Only valid for particle_kinetic_relativistic
 !>   'experimental' -> Samples from external F(R, Z, energy, pitch) distribution, expects 'experimental_dist.h5' hdf5 file with the correct format
@@ -82,14 +82,14 @@ module mod_initialise_particles
     !> Compatability check : init_function x particle_type
     select type(particles => sim%groups(group_num)%particles)
     type is (particle_kinetic_relativistic)
-      if (trim(config%init_function) /= 'gaussian_re') then
-        write(*,*) "ERROR : particle_kinetic_relativistic requred init_function='gaussian_re'"
+      if (trim(config%init_function) /= 're_gaussian') then
+        write(*,*) "ERROR : particle_kinetic_relativistic requred init_function='re_gaussian'"
         write(*,*) "        got init_function='",trim(config%init_function),"' for group '", trim(config%id), "'"
         call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
       endif
     type is (particle_kinetic_leapfrog)
-      if (trim(config%init_function) == 'gaussian_re') then
-        write(*,*) "ERROR (initialise_group): particle_kinetic_leapfrog incompatible with init_function='gaussian_re'"
+      if (trim(config%init_function) == 're_gaussian') then
+        write(*,*) "ERROR (initialise_group): particle_kinetic_leapfrog incompatible with init_function='re_gaussian'"
         call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
       endif
     end select
@@ -139,19 +139,19 @@ module mod_initialise_particles
         n_phi_planes_in=config%n_phi_planes, fraction_phi_planes=1.d0)
 
     !> REs : Monoenergetic or Gaussian energy distribution
-    case('gaussian_re')
+    case('re_gaussian')
       if (sim%my_id == 0) then
-        write(*,*) "  Sampler: gaussian_re_initialisation"
+        write(*,*) "  Sampler: re_gaussian_initialisation"
         write(*,'(A,ES12.3,A)') "  Energy : ", config%re_energy, " [eV]"
         write(*,'(A,ES12.3,A)') "  std    : ", config%re_std_energy, " [eV]"
         write(*,'(A,ES12.3)')   "  Pitch  : ", config%re_pitch
       endif
 
       if (associated(space_pdf%f)) then
-        call initialise_gaussian_re(sim, group_num, pcg32_rng(), &
+        call initialise_re_gaussian(sim, group_num, pcg32_rng(), &
           space_pdf, config%re_energy, config%re_pitch, config%re_std_energy)
       else
-        call initialise_gaussian_re(sim, group_num, pcg32_rng(), &
+        call initialise_re_gaussian(sim, group_num, pcg32_rng(), &
           energy=config%re_energy, pitch=config%re_pitch, std_energy=config%re_std_energy)
       endif
 
@@ -160,7 +160,7 @@ module mod_initialise_particles
       if (sim%my_id == 0) then
         write(*,*) "ERROR (initialise_group): unknown init_function '", &
           trim(config%init_function), "' for group '", trim(config%id), "'"
-        write(*,*) "  Valid init_functions: 'maxwell', 'gaussian_re', 'experimental'"
+        write(*,*) "  Valid init_functions: 'maxwell', 're_gaussian', 'experimental'"
       endif
       call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
     
