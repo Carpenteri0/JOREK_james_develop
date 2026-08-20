@@ -27,11 +27,13 @@ module mod_initialise_particles
   use mod_import_experimental_dist
   use phys_module, only: part_group_configs, type_part_group_config, n_part_groups
   use mod_particle_group_id, only: matching_part_config_indices
-  use mpi
+  use mpi, only: MPI_ABORT, MPI_COMM_WORLD
 
 
   implicit none
-  integer :: ierr !> mpi error code
+  private
+
+  public :: initialise_particles_for_sim
 
   contains
 
@@ -76,6 +78,7 @@ module mod_initialise_particles
     type(type_part_group_config) :: config
     type(spatial_pdf)            :: space_pdf
     logical                      :: exists
+    integer                      :: ierr
 
     config = part_group_configs(matching_part_config_indices(group_num))
 
