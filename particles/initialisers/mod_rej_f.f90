@@ -23,6 +23,12 @@ module mod_rej_f
     use mpi
 
     implicit none
+
+    !> Normalisation range for current_pdf, in units of j_tor/R
+    !> Set from the equilibrium by calibrate_current_pdf() when the 'current'
+    !> pdf is constructed - never use current_pdf without that call.
+    real*8 :: jzmin = 0.d0, jzmax = 0.d0
+
     private
 
     public :: spatial_pdf
@@ -128,6 +134,7 @@ module mod_rej_f
                 write(*,*) "  with var_zj > 0. j_tor is not a stored variable in this model"
                 call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
             endif
+            call calibrate_current_pdf(node_list, element_list)
             pdf%f          => current_pdf
             pdf%vars       =  [-1, var_zj]
             pdf%needs_grad = .false.
@@ -145,6 +152,75 @@ module mod_rej_f
             call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
         end select
     end function spatial_pdf_from_name
+
+    !> Set the j_tor/R normalisation range used by current_pdf, once per run.
+    !>
+    !> find_variable_mimax returns the extrema of one variable over an element's edges
+    !> j_tor and R are bounded independently and combined afterwardds, which can only widen the range.
+    subroutine calibrate_current_pdf(node_list, element_list)
+        use mod_newton_methods, only: find_variable_minmax
+
+        !> i/o vars
+        type(type_node_list),    intent(in) :: node_list
+        type(type_element_list), intent(in) :: element_list
+ 
+        !> internal vars
+        real*8  :: zj_lo, zj_hi, R_lo, R_hi, e_lo, e_hi
+        integer :: i_elm, my_id, ierr
+
+        zj_lo = 1.d10; zj_hi = -1.d10
+        R_lo  = 1.d10; R_hi  = -1.d10
+        
+        do i_elm = 1, element_list%n_elements
+            call find_variable_minmax(node_list, element_list, i_elm, var_zj, e_lo, e_hi)
+            zj_lo = min(zj_lo, e_lo); zj_hi = max(zj_hi, e_hi)
+            call find_variable_minmax(node_list, element_list, i_elm, -1, e_lo, e_hi)
+            R_lo  = min(R_lo, e_lo);  R_hi  = max(R_hi, e_hi)
+        enddo
+
+        !> R>0 on any grid, so j_tor/R is extremal at an R endpoint;
+        jzmin = min(zj_lo/R_lo, zj_lo/R_hi)
+        jzmax = max(zj_hi/R_lo, zj_hi/R_hi)
+
+        call MPI_COMM_RANK(MPI_COMM_WORLD, my_id, ierr)
+
+        if (jzmax .le. jzmin) then
+            if (my_id == 0) then
+                write(*,*) "ERROR (mod_rej_f): 'current' spatial PDF found no spread in j_tor/R"
+                write(*,*) " j_tor range ", zj_lo, zj_hi
+                write(*,*) " R     range ", R_lo, R_hi
+            endif
+            call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+        endif
+
+        if (my_id == 0) then
+            write(*,'(A,2ES12.3)') "  j_tor    range : ", zj_lo, zj_hi
+            write(*,'(A,2Es12.3)') "  j_tor/R  range : ", jzmin, jzmax
+        endif
+    end subroutine calibrate_current_pdf
+
+    !> Check that a spatial_pdf satisfies the invariants the samplers rely on.
+    !> Does nothing for an inavtive pdf (f => null(), ie init_pdf = 'none')
+    subroutine check_spatial_pdf(pdf, caller)
+        type(spatial_pdf), intent(in) :: pdf
+        character(len=*),  intent(in) :: caller !> name to quote in error message
+
+        integer :: ierr
+
+        if (.not. associated(pdf%f)) return
+
+        if (.not. allocated(pdf%vars)) then
+            write(*,*) "ERROR (", caller, "): spatial_pdf has a rejection function but no vars(:)"
+            call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+        endif
+
+        !> Ascendinf order puts the geometric entries (<= 0) first, which is how
+        !> the samplers split vars(:) into geometric and JOREK variables
+        if (any(pdf%vars(2:) < pdf%vars(:size(pdf%vars)-1))) then
+            write(*,*) "ERROR (", caller, "): spatial_pdf vars(:) must be in ascending order, got ", pdf%vars
+            call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+        endif
+    end subroutine check_spatial_pdf
 
 
     ! =============================================================================
@@ -226,11 +302,7 @@ module mod_rej_f
         real*8, dimension(3,n), intent(in) :: gradP
         real*4                             :: f
 
-        !> TODO: make jzmin.jzmax namelist params
-        real*8, parameter :: jzmax = 3.0d0 / 10.0d0
-        real*8, parameter :: jzmin = 1.239d-4 / 11.0d0
-
         f = real((P(2)/P(1) - jzmin) / (jzmax - jzmin), 4)
-        f = max(f, 0.0e0)
+        f = min(max(f, 0.0e0), 1.0e0)
     end function current_pdf
 end module mod_rej_f
