@@ -203,7 +203,7 @@ namelist /in1/  tstep, nstep, tstep_n, nstep_n,                     &
                 filter_perp,    filter_hyper,    filter_par,        &
                 filter_perp_n0, filter_hyper_n0, filter_par_n0,     &
                 apply_dirichlet_proj, restart_particles,            &
-                proj_collection_period,                             &
+                proj_collection_period, T_thermal_file,             &
                 part_group_configs, part_groups_in_use, valves,     &
                 fluid_configs, init_particles_only,                 &
                 find_RZ_nearby_iter, find_RZ_nearby_tol,            &

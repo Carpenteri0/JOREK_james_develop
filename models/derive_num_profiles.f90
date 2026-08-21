@@ -39,6 +39,12 @@ subroutine derive_num_profiles(my_id)
       call derivProf(num_Phi_x, num_Phi_y1, num_Phi_len, num_Phi_y2)
       call derivProf(num_Phi_x, num_Phi_y2, num_Phi_len, num_Phi_y3)
     end if
+
+    if ( num_T_thermal ) then
+      call derivProf(num_T_thermal_x, num_T_thermal_y0, num_T_thermal_len, num_T_thermal_y1)
+      call derivProf(num_T_thermal_x, num_T_thermal_y1, num_T_thermal_len, num_T_thermal_y2)
+      call derivProf(num_T_thermal_x, num_T_thermal_y2, num_T_thermal_len, num_T_thermal_y3)
+    endif
     
     if ( num_Fprofile ) then
       call derivProf(num_Fprofile_x, num_Fprofile_y0, num_Fprofile_len, num_Fprofile_y1)

@@ -56,6 +56,9 @@ if ( (my_id .eq. 0) .and. (n_order .le. 3) ) then
 
       call temperature_e(xpoint2, xcase2, Z, ES%Z_xpoint, psi,ES%psi_axis,ES%psi_bnd,zTe,dTe_dpsi,dTe_dz,dTe_dpsi2,dTe_dz2, &
                                                                  dTe_dpsi_dz,dTe_dpsi3,dTe_dpsi_dz2, dTe_dpsi2_dz)
+    elseif ( num_T_thermal ) then
+      call temperature_thermal(xpoint2, xcase2, Z, ES%Z_xpoint, psi, ES%psi_axis, ES%psi_bnd, zT, dT_dpsi, dT_dz, dT_dpsi2, &
+                                                                 dT_dz2, dT_dpsi_dz, dT_dpsi3, dT_dpsi_dz2, dT_dpsi2_dz)
     else
       call temperature(xpoint2,  xcase2, Z, ES%Z_xpoint, psi,ES%psi_axis,ES%psi_bnd,zT, dT_dpsi, dT_dz, dT_dpsi2, dT_dz2, &
                                                                  dT_dpsi_dz, dT_dpsi3, dT_dpsi_dz2,  dT_dpsi2_dz)

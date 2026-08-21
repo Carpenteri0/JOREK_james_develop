@@ -59,6 +59,12 @@ subroutine read_num_profiles(my_id)
     T_0 = Te_0 + Ti_0
     T_1 = Te_1 + Ti_1
   end if
+
+  num_T_thermal = ( T_thermal_file /= 'none' )
+  if ( num_T_thermal .and. ( my_id == 0) ) then
+    call readProf(num_T_thermal_x, num_T_thermal_y0, num_T_thermal_len, T_thermal_file)
+    call check_num_prof(num_T_thermal, num_T_thermal_x, num_T_thermal_y0, num_T_thermal_len, 'T_thermal', check_positive=.true.)
+  endif
   
   num_ffprime = ( ffprime_file /= 'none' )
   if ( num_ffprime .and. ( my_id == 0 ) ) then
