@@ -25,6 +25,7 @@ module mod_initialise_particles
   use initialisers_RE
   use initialisers_base
   use mod_import_experimental_dist
+  use mod_EPCoM_interface
   use phys_module, only: part_group_configs, type_part_group_config, n_part_groups
   use mod_particle_group_id, only: matching_part_config_indices
   use mpi, only: MPI_ABORT, MPI_COMM_WORLD
@@ -131,6 +132,19 @@ module mod_initialise_particles
       call import_particles(sim%groups(group_num)%particles, sim%fields, &
         "experimental_dist.h5", pcg32_rng(), sim%groups(group_num)%mass, &
         n_phi_planes_in=config%n_phi_planes, fraction_phi_planes=1.d0)
+
+    !> EPs : EPCoM initialiser - f(P_phi, muB_0/E, E, sigma), expects a EPCoM_CoM_pdf.nc file - see mod_EPCoM_interface
+    case ('EPCoM')
+      if (sim%my_id == 0) write(*,*) "  Sampler: initialise_from_EPCoM - experimental distribution from 'EPCoM_CoM_pdf.nc' file"
+
+      !> check for existence of EPCoM_CoM_pdf.nc file
+      inquire(file="EPCoM_CoM_pdf.nc", exist=exists)
+      if (.not. exists) then
+        if (sim%my_id == 0) write(*,*) "ERROR (initialise_group): init_function='EPCoM' requires 'EPCoM_CoM_pdf.nc' file in working directory"
+        call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+      endif
+
+      call initialise_from_EPCoM(sim, group_num)
 
     !> REs : Monoenergetic or Gaussian energy distribution
     case('re_gaussian')
