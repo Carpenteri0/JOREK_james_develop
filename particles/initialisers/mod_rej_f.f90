@@ -369,7 +369,6 @@ module mod_rej_f
     !>                 P(2) = j_tor
     !>
     !> NOTE : Won't work for fMHD models, see note in constructor above
-    !> NOTE : jzmin and jzmax are currently hardcoded, needs better handling
     pure function current_pdf(n, P, gradP) result(f)
         integer,                intent(in) :: n
         real*8, dimension(n),   intent(in) :: P
