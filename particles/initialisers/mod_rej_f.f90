@@ -21,6 +21,8 @@ module mod_rej_f
     use equil_info       ! (R_axis,Z_axis), etc..
     use mod_model_settings
     use mpi
+    use mod_interp
+    use data_structure
 
     implicit none
 
@@ -33,8 +35,10 @@ module mod_rej_f
 
     public :: spatial_pdf
     public :: rej_f
+    public :: spatial_pdf_from_name
+    public :: check_spatial_pdf
+    public :: eval_rej_f
     public :: itpa_tae_pdf, RZ_pdf, analytical_pdf, current_pdf
-    public :: spatial_pdf_from_name, check_spatial_pdf
 
     ! =============================================================================
     ! Interface
@@ -221,6 +225,76 @@ module mod_rej_f
             call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
         endif
     end subroutine check_spatial_pdf
+
+    !> Evaluate the variables a spatial rejection function needs at one sample point.
+    !>
+    !> Fills P(:), and gradP(:,:) when needs_grad, in the order given by variables(:),
+    !> following the index convenction documented in mod_rej_f:
+    !>     >0: JOREK variable number
+    !>      0: constant 1, -1: R, -2: Z, -3: Phi
+    !> variables(:) must be sorted ascending, so the n_geom non-positive entries
+    !> come first and the n_mhd JOREK variables last.
+    !>
+    !> gradP is (d/dR, d/dZ, d/dphi) and is set to zero when needs_grad is .false.
+    pure function eval_rej_f(node_list, element_list, i_elm, s, t, phi, R, Z, space_pdf) result(f)
+
+    !> i/o vars
+    type(type_node_list),    intent(in)  :: node_list
+    type(type_element_list), intent(in)  :: element_list
+    integer,                 intent(in)  :: i_elm
+    real*8,                  intent(in)  :: s, t       !> local element coordinates
+    real*8,                  intent(in)  :: R, Z, phi  !> global cylindrical coordinates
+    type(spatial_pdf),       intent(in)  :: space_pdf
+    real*4                               :: f          !> acceptance probability
+    
+    !> internal vars
+    real*8, parameter :: EPS_JAC = 1.d-12    !> below this element is degenerate
+    integer           :: n_geom, n_mhd, k
+    real*8            :: P(size(space_pdf%vars)), gradP(3,size(space_pdf%vars))
+    real*8            :: P_s(count(space_pdf%vars > 0)), P_t(count(space_pdf%vars > 0))
+    real*8            :: P_phi(count(space_pdf%vars > 0))
+    real*8            :: R_i, R_S, R_t, Z_i, Z_s, Z_t, xjac, inv_xjac
+
+    n_mhd  = count(space_pdf%vars > 0)
+    n_geom = size(space_pdf%vars) - n_mhd
+    gradP  = 0.d0
+
+    !> Geomteric vars
+    do k = 1, n_geom
+        select case (space_pdf%vars(k))
+        case(0);  P(k) = 1.d0
+        case(-1); P(k) = R   ; if (space_pdf%needs_grad) gradP(1,k) = 1.d0
+        case(-2); P(k) = Z   ; if (space_pdf%needs_grad) gradP(2,k) = 1.d0
+        case(-3); P(k) = phi ; if (space_pdf%needs_grad) gradP(3,k) = 1.d0
+        endselect
+    enddo
+
+    !> MHD Variables : values only unless the rej_f asked for gradients
+    !> interpolated within the element
+    if (n_mhd .ge. 1) then
+        if (space_pdf%needs_grad) then
+        call interp_PRZ(node_list, element_list, i_elm, space_pdf%vars(n_geom+1:), n_mhd, &
+            s, t, phi, P(n_geom+1:), P_s, P_t, P_phi, R_i, R_s, R_t, Z_i, Z_s, Z_t)
+
+        !> interp_PRZ gives s,t derivatives - transform to R,Z
+        !> degenerate element (e.g axis point) -> leave gradient zero
+        xjac     = R_s*Z_t - R_t*Z_s
+        inv_xjac = 0.d0
+        if (abs(xjac) > EPS_JAC) inv_xjac = 1.d0/xjac
+
+        do k = 1, n_mhd
+            gradP(1,n_geom+k) = ( Z_t*P_s(k) - Z_s*P_t(k)) * inv_xjac
+            gradP(2,n_geom+k) = (-R_t*P_s(k) + R_s*P_t(k)) * inv_xjac
+            gradP(3,n_geom+k) = P_phi(k)
+        enddo
+        else
+        call interp_PRZ(node_list, element_list, i_elm, space_pdf%vars(n_geom+1:), n_mhd, &
+            s, t, phi, P(n_geom+1:), R_i, Z_i)
+        endif
+    endif
+
+    f = space_pdf%f(size(space_pdf%vars), P, gradP)
+    end function eval_rej_f
 
 
     ! =============================================================================
