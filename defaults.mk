@@ -276,6 +276,12 @@ ifeq (1, $(USE_MUMPS))
   DEFINES := $(DEFINES) -DUSE_MUMPS
 endif
 
+ifeq (1, $(USE_NETCDF))
+  LIBS     := $(LIBS) $(NETCDF_LIB)
+  INCLUDES := $(INCLUDES) $(NETCDF_INC)
+  DEFINES  := $(DEFINES) -DUSE_NETCDF
+endif
+
 ifeq (1, $(USE_HDF5))
   LIBS     := $(LIBS) $(HDF5LIB)
   INCLUDES := $(INCLUDES) -I$(HDF5INCLUDE)
