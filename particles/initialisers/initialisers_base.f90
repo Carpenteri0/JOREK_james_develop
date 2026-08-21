@@ -89,11 +89,11 @@ contains
 !> come first and the n_mhd JOREK variables last.
 !>
 !> gradP is (d/dR, d/dZ, d/dphi) and is set to zero when needs_grad is .false.
-pure function eval_rej_vars(node_list, element_list, i_elm, s, t, phi, R, Z, space_pdf) result(f)
+pure function eval_rej_f(node_list, element_list, i_elm, s, t, phi, R, Z, space_pdf) result(f)
 
   !> i/o vars
   type(type_node_list),    intent(in)  :: node_list
-  type(tyep_element_list), intent(in)  :: element_list
+  type(type_element_list), intent(in)  :: element_list
   integer,                 intent(in)  :: i_elm
   real*8,                  intent(in)  :: s, t       !> local element coordinates
   real*8,                  intent(in)  :: R, Z, phi  !> global cylindrical coordinates
@@ -116,9 +116,9 @@ pure function eval_rej_vars(node_list, element_list, i_elm, s, t, phi, R, Z, spa
   do k = 1, n_geom
     select case (space_pdf%vars(k))
       case(0);  P(k) = 1.d0
-      case(-1); P(k) = R   ; if (needs_grad) gradP(1,k) = 1.d0
-      case(-2); P(k) = Z   ; if (needs_grad) gradP(2,k) = 1.d0
-      case(-1); P(k) = phi ; if (needs_grad) gradP(3,k) = 1.d0
+      case(-1); P(k) = R   ; if (space_pdf%needs_grad) gradP(1,k) = 1.d0
+      case(-2); P(k) = Z   ; if (space_pdf%needs_grad) gradP(2,k) = 1.d0
+      case(-3); P(k) = phi ; if (space_pdf%needs_grad) gradP(3,k) = 1.d0
     endselect
   enddo
 
@@ -142,12 +142,12 @@ pure function eval_rej_vars(node_list, element_list, i_elm, s, t, phi, R, Z, spa
       enddo
     else
       call interp_PRZ(node_list, element_list, i_elm, space_pdf%vars(n_geom+1:), n_mhd, &
-        s, t, phi, P(n_geom+1), R_i, Z_i)
+        s, t, phi, P(n_geom+1:), R_i, Z_i)
     endif
   endif
 
   f = space_pdf%f(size(space_pdf%vars), P, gradP)
-end function eval_rej_vars
+end function eval_rej_f
 
 
 !> Set positions for particles by rejection sampling from geometric and mhd
@@ -651,8 +651,9 @@ subroutine initialise_particles_H_mu_psi(particles, fields, rng_base, mass, T_ma
   real*8,                intent(in), optional       :: alpha !< Make more fast (>0) or slow (<0) particles and weigh them appropriately
   real*8,                intent(in), optional       :: E_max !< If alpha=1 we select particles from a block-distribution, up to E_max
   logical,               intent(in), optional       :: include_vpar !< Initialize particles with local parallel velocity
+  logical,               intent(in), optional       :: uniform_space !< Do not
+  !< use {psi,theta}_transform if present bute rejection sampling in RZ
   type(spatial_pdf),     intent(in), optional       :: space_pdf !< spatial pdf to reject against when uniform_space is set. If absent the RZ sampling is uniform
-  integer, dimension(:), intent(in), optional       :: uniform_space_rej_vars !< Variables to use for uniform_space_rej_f
   type(coronal),         intent(in), optional       :: cor !< Coronal equilibrium datatype for this particle. If unset, do not alter q
   integer,               intent(in), optional       :: charge !< Use this if cor is not present
   real*8,                intent(in), optional       :: T_Maxwell !< constant Maxwellian temperature [eV]

@@ -98,7 +98,7 @@ module mod_initialise_particles
     end select
 
     !> Set real-space pdf
-    space_pdf = spatial_pdf_from_name(trim(config%init_pdf))
+    space_pdf = spatial_pdf_from_name(trim(config%init_pdf), sim%fields%node_list, sim%fields%element_list)
 
     !> Select phase-space initialiser and sample in both real- and phase-space
     select case(trim(config%init_function))
