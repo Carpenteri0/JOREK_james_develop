@@ -743,6 +743,16 @@ module phys_module
   real*8, allocatable :: num_Te_y1(:)    !< First derivatives of temperature profile (\f$ dT/d\Psi_N \f$)
   real*8, allocatable :: num_Te_y2(:)    !< Second derivatives of temperature profile (\f$ d^2T/d\Psi_N^2 \f$)
   real*8, allocatable :: num_Te_y3(:)    !< Third derivatives of temperature profile (\f$ d^3T/d\Psi_N^3 \f$)  
+
+  !> @name Numerical input profile for the thermal temperature when particle pressure is taken into account
+  character(len=512)  :: T_thermal_file      !< ASCII file the thermal temperature profile is read from
+  logical             :: num_T_thermal       !< is set trie if T_thermal_file /= 'none'
+  integer             :: num_T_thermal_len   !< Number of points in profile
+  real*8, allocatable :: num_T_thermal_x(:)  !< Radial positions of profile points (PsiN values)
+  real*8, allocatable :: num_T_thermal_y0(:) !< Values of temperature profile
+  real*8, allocatable :: num_T_thermal_y1(:) !< First derivatives of temperature profile (\f$ dT/d\Psi_N \f$)
+  real*8, allocatable :: num_T_thermal_y2(:) !< Second derivatives of temperature profile (\f$ d^2T/d\Psi_N^2 \f$)
+  real*8, allocatable :: num_T_thermal_y3(:) !< Third derivatives of temperature profile (\f$ d^3T/d\Psi_N^3 \f$)
   
   !> @name Analytical input profile for the neutral density (model 500)
   real*8  :: rhon_0           !< Central value for the initial normalized neutral density

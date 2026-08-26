@@ -585,6 +585,7 @@ subroutine preset_parameters
   T_file             = 'none'
   Te_file            = 'none'
   Ti_file            = 'none'
+  T_thermal_file     = 'none'
   phi_file           = 'none'
   Fprofile_file      = 'none'
   ffprime_file       = 'none'

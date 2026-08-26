@@ -55,8 +55,13 @@ if ( (my_id .eq. 0) .and. (n_order .le. 3) ) then
     call density(    xpoint2, xcase2, Z, ES%Z_xpoint, psi,ES%psi_axis,ES%psi_bnd,zn,dn_dpsi,dn_dz,dn_dpsi2,dn_dz2,             &
                                                                dn_dpsi_dz,dn_dpsi3,dn_dpsi_dz2, dn_dpsi2_dz)
 
-    call temperature(xpoint2, xcase2, Z, ES%Z_xpoint, psi,ES%psi_axis,ES%psi_bnd,zT,dT_dpsi,dT_dz,dT_dpsi2,dT_dz2,             &
+    if (num_T_thermal) then
+      call temperature_thermal(xpoint2, xcase2, Z, ES%Z_xpoint, psi, ES%psi_axis, ES%psi_bnd, zT, dT_dpsi, dT_dz, dT_dpsi2,    &
+                                                               dT_dz2, dT_dpsi_dz, dT_dpsi3, dT_dpsi_dz2, dT_dpsi2_dz)
+    else
+      call temperature(xpoint2, xcase2, Z, ES%Z_xpoint, psi,ES%psi_axis,ES%psi_bnd,zT,dT_dpsi,dT_dz,dT_dpsi2,dT_dz2,           &
                                                                dT_dpsi_dz,dT_dpsi3,dT_dpsi_dz2, dT_dpsi2_dz)
+    endif
 
     node_list%node(i)%values(1,:,var_uR) = 0.d0    
     node_list%node(i)%values(1,:,var_uZ) = 0.d0
