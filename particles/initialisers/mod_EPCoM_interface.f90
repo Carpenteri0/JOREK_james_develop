@@ -72,6 +72,7 @@ module mod_EPCoM_interface
         real*8  :: max_H
         integer :: ifail, ierr
         integer :: tid
+        integer :: n_tries_local, n_tries_global
         real*8, allocatable :: stored_x(:,:), stored_v(:,:), stored_st(:,:)
         integer, allocatable:: stored_ielm(:)
 
@@ -82,6 +83,9 @@ module mod_EPCoM_interface
             write(*,*) "=============================="
             write(*,*) ""
         endif
+
+        n_tries_local  = 0
+        n_tries_global = 0
 
         mass      = sim%groups(group_num)%mass * ATOMIC_MASS_UNIT
         atomic_no = sim%groups(group_num)%Z
@@ -133,7 +137,8 @@ module mod_EPCoM_interface
        !$omp private(i_part, R, Z, phi, Energy, Pitch, P_phi, gyro_angle, Lambda,   &
        !$omp         ran, s, t, psi, U, E, B, B_norm, e1, e2, v, v_squared, v_par,  &
        !$omp         v_perp, v_phi, sig, Jac_Ep, F_loc, H_loc, randvarf, ifail,     &
-       !$omp         ierr, i_elm, dummy_R, dummy_Z, accepted, is_outside, tid)
+       !$omp         ierr, i_elm, dummy_R, dummy_Z, accepted, is_outside, tid)      &
+       !$omp reduction(+:n_tries_local)
 
         !> omp loop over total number of marker particles to find
         do i_part = 1, n_particles
@@ -143,6 +148,7 @@ module mod_EPCoM_interface
             !> loop untill found acceptable particle (rej sample loop)
             accepted = .false.
             do while (.not. accepted)
+                n_tries_local = n_tries_local + 1
 
         ! ---- 1. Draw (unif) random number and convert to phase space point ----
                 call rng(tid)%next(ran)  !> 7 uniform values in [0,1]
@@ -199,6 +205,9 @@ module mod_EPCoM_interface
         enddo !> particle loop
         !$omp end parallel do
 
+        !> Count up number of tries from each MPI proc
+        call MPI_ALLReduce(n_tries_local, n_tries_global, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
+
         ! ---- 9. Pass stored values to particle object
         select type(p => sim%groups(group_num)%particles)
         type is (particle_kinetic_leapfrog)
@@ -221,6 +230,10 @@ module mod_EPCoM_interface
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
         deallocate(stored_x, stored_v, stored_st, stored_ielm, rng)
 
+        ! ---- 10. Print number of tries
+        if (sim%my_id == 0) then
+            write(*,'(A,I12)') "  Number of proposals        : ", n_tries_global
+        endif
     end subroutine initialise_from_EPCoM
 
     !> Read file on root proc and communicate to all other procs
