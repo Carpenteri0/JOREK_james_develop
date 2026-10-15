@@ -1802,6 +1802,7 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
   use mod_fields
   use mod_pcg32_rng
   use mod_pusher_tools
+  use mod_sampling
   !use mod_bors
   use phys_module, only: F0
   !$ use omp_lib
@@ -1817,7 +1818,7 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
   class(type_rng), dimension(:), allocatable :: rng                             !> ran no. generator
   real*8                       :: ran(8)                                        !> ran no.
   real*8                       :: PitchBox(2), vBox(2), Rbox(2), ZBox(2)        !> bounding boxes
-  real*8                       :: v_c, f_v, heaviside, max_pdf                  !> slowing-down dist vars
+  real*8                       :: v_c, f_v, heaviside, pdf_peak, v_peak         !> slowing-down dist vars
   real*8                       :: R, Z, phi, s, t, f_x                          !> real-space coords
   real*8                       :: v(3), v_mag, pitch, gyro_angle, v_par, v_perp !> phase-space coords
   real*8                       :: dummy_R, dummy_Z
@@ -1836,8 +1837,9 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
   use_rej = associated(space_pdf%f)
 
   !> init slowing down dist values
-  v_c         = 0.58d0*v_max
-  max_pdf     = 1 / (v_c**3)
+  v_c      = 0.58d0*v_max
+  v_peak   = 2**(1/3)*v_c  
+  pdf_peak = v_peak**2 / (v_peak**3 + v_c**3)
 
 
   !> init arrays
@@ -1859,7 +1861,7 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
 
   !$omp parallel do default(none) &
   !$omp shared( sim, rng, n_particles, v_max, v_c, PitchBox,   &
-  !$omp         vBox, Rbox, Zbox, max_pdf, use_rej, space_pdf, &
+  !$omp         vBox, Rbox, Zbox, pdf_peak, use_rej, space_pdf, &
   !$omp         stored_ielm, stored_x, stored_v, stored_st)    &
   !$omp private(i_part, accepted, tid, ran, R, Z, dummy_R, dummy_Z, &
   !$omp         phi, v, v_mag, pitch, gyro_angle, s, t, heaviside,  &
@@ -1880,9 +1882,7 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
 
     ! ---- 1. draw uniform random number and convert to coordinates
       call rng(tid)%next(ran)
-      R          = ran(1) * (RBox(2)     - RBox(1)) + RBox(1) 
-      Z          = ran(2) * (ZBox(2)     - ZBox(1)) + ZBox(1) 
-      phi        = ran(3) * TWOPI 
+      call transform_uniform_cylindrical(ran(1:3), Rbox, Zbox, [0.d0, TWOPI], R, Z, phi)
       v_mag      = ran(4) * (vBox(2)     - vBox(1)) + vBox(1) 
       pitch      = ran(5) * (PitchBox(2) - PitchBox(1)) + PitchBox(1) 
       gyro_angle = ran(6) * TWOPI
@@ -1896,10 +1896,10 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
       heaviside = 0.d0
       if (v_mag .le. v_max) heaviside = 1.d0
 
-      f_v = heaviside / (v_mag**3 + v_c**3)
-      f_v = f_v / max_pdf
+      f_v = heaviside*v_mag**2 / (v_mag**3 + v_c**3)
+      f_v = f_v / pdf_peak
 
-      !> reject if ran(7) > p(v)/max_pdf
+      !> reject if ran(7) > p(v)/pdf_peak
       if (ran(7) .gt. f_v) cycle
 
     ! --- 4. Evaluate real-space distribution for this position

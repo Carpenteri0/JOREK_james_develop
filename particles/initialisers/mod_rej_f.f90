@@ -158,7 +158,7 @@ module mod_rej_f
         case default
             write(*,*) "ERROR (mod_rej_f): Unknown spatial PDF name '", trim(name), "'"
             write(*,*) "      Valid names: 'itpa_tae', 'RZ', 'analytical', "
-            write(*,*) "                   'current', 'none'"
+            write(*,*) "                   'current', 'exp_psin', 'none'"
             call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
         end select
     end function spatial_pdf_from_name
@@ -330,7 +330,11 @@ module mod_rej_f
         psi_norm = max((P(1) - ES%Psi_axis) / ( ES%Psi_bnd - ES%Psi_axis),0.d0)
         s        = 0.957 * psi_norm + 0.043 * psi_norm**2
 
-        f = real(coeff(3)*exp(-coeff(2)/coeff(1)*(tanh((sqrt(s)-coeff(0))/coeff(2)))), 4)
+        if (psi_norm > 1.d0) then
+            f = 0
+        else
+            f = real(coeff(3)*exp(-coeff(2)/coeff(1)*(tanh((sqrt(s)-coeff(0))/coeff(2)))), 4)
+        endif
     end function itpa_tae_pdf
 
     !> rejection function based off exponential drop-off in psi_n
@@ -348,7 +352,11 @@ module mod_rej_f
         psi_norm = max((P(1) - ES%Psi_axis) / (ES%Psi_bnd - ES%Psi_axis), 0.d0)
 
         !> eval pdf
-        f = exp(-psi_norm/0.25d0)
+        if (psi_norm > 1.d0) then
+            f = 0
+        else
+            f = exp(-psi_norm/0.25d0)
+        endif
     end function exp_psin_pdf
 
     !> Weight as 1/(1 + r_minor)^2 - broad profile peaked on axis
