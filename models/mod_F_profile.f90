@@ -36,7 +36,9 @@ subroutine F_profile(xpoint2,xcase2,Z,Z_xpoint,psi,psi_axis,psi_bnd,&
   ! for interpolating numerical profiles
   integer :: left, right, mid
   real*8  :: Fmid, dFmid, d2Fmid, d3Fmid
-  real*8  :: aux1, aux2
+  real*8  :: aux1, aux2, S_G
+  logical :: direct_FF
+  real*8  :: FFd0, FFd1, FFd2
 
   ! --- Jorek uses -FF' as a convention, so we need to reverse the profile before integrating
   real*8  :: myFF_0, myFF_1, myFF_coef(8)
@@ -60,6 +62,8 @@ subroutine F_profile(xpoint2,xcase2,Z,Z_xpoint,psi,psi_axis,psi_bnd,&
   dF_dpsi2   = 0.d0
   dF_dz2     = 0.d0
   dF_dpsi_dz = 0.d0
+  direct_FF  = .false.
+
   ! --- Profile as a function of Psi_N.
   if (force_analytical) then 
 
@@ -168,28 +172,51 @@ subroutine F_profile(xpoint2,xcase2,Z,Z_xpoint,psi,psi_axis,psi_bnd,&
       dprof0_dpsi  = dFmid
       dprof0_dpsi2 = d2Fmid
       dprof0_dpsi3 = d3Fmid
-    ! --- It's not F' that we integrate in the routine "integrate_F_profile"
-    ! --- It's (F^2)', and therefore the denormalisation is not just a matter of a factor delta_psi
+    ! ! --- It's not F' that we integrate in the routine "integrate_F_profile"
+    ! ! --- It's (F^2)', and therefore the denormalisation is not just a matter of a factor delta_psi
+    ! else
+    !   if (F0 .lt. 0.d0) Fmid   = - Fmid  
+    !   if (F0 .lt. 0.d0) dFmid  = - dFmid 
+    !   if (F0 .lt. 0.d0) d2Fmid = - d2Fmid
+    !   if (F0 .lt. 0.d0) d3Fmid = - d3Fmid
+    !   prof0        = + ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(+0.5)
+    !   dprof0_dpsi  = + ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-0.5) * (Fmid * dFmid)
+    !   dprof0_dpsi2 = - ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-1.5) * (Fmid * dFmid)**2 &
+    !                  + ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-0.5) * (dFmid**2 + Fmid * d2Fmid) / delta_psi
+    !   dprof0_dpsi3 = + 3 * ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-2.5) * (Fmid * dFmid)**3 &
+    !                  - ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-1.5) * ( (2 * d2Fmid * dFmid * Fmid**2) + 2 * (dFmid**3 * Fmid)) / delta_psi &
+    !                  - ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-1.5) * ((dFmid**3) * Fmid + d2Fmid * dFmid * Fmid**2) / delta_psi &
+    !                  + ( delta_psi * (Fmid**2 - F0**2) + F0**2 ) ** (-0.5) * ( (3 * dFmid * d2Fmid) + (Fmid * d3Fmid) ) / (delta_psi)**2
+      !> JAMES
+      !> prof0 used to store sqrt(Fmid...)
+      !> Now it stores Fmid^2 - F0^2 = 2*int(FF')dpsi_n
     else
-      if (F0 .lt. 0.d0) Fmid   = - Fmid  
-      if (F0 .lt. 0.d0) dFmid  = - dFmid 
-      if (F0 .lt. 0.d0) d2Fmid = - d2Fmid
-      if (F0 .lt. 0.d0) d3Fmid = - d3Fmid
-      prof0        = + ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(+0.5)
-      dprof0_dpsi  = + ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-0.5) * (Fmid * dFmid)
-      dprof0_dpsi2 = - ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-1.5) * (Fmid * dFmid)**2 &
-                     + ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-0.5) * (dFmid**2 + Fmid * d2Fmid) / delta_psi
-      dprof0_dpsi3 = + 3 * ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-2.5) * (Fmid * dFmid)**3 &
-                     - ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-1.5) * ( (2 * d2Fmid * dFmid * Fmid**2) + 2 * (dFmid**3 * Fmid)) / delta_psi &
-                     - ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-1.5) * ((dFmid**3) * Fmid + d2Fmid * dFmid * Fmid**2) / delta_psi &
-                     + ( delta_psi * (Fmid**2 - F0**2) + F0**2 ) ** (-0.5) * ( (3 * dFmid * d2Fmid) + (Fmid * d3Fmid) ) / (delta_psi)**2
+      S_G = delta_psi * Fmid + F0**2
+      direct_FF = .true.
+      FFd0      = 0.5d0 * dFmid
+      FFd1      = 0.5d0 * d2Fmid / delta_psi
+      FFd2      = 0.5d0 * d3Fmid / delta_psi
+      if (S_G .le. 0.d0) then
+        if (abs(delta_psi - 1.d0) .gt. 1.d-12) then
+          write(*,*) "F_profile : F^2 <= 0 at psi_n = ", psi_n, "F^2 = ", S_G 
+          stop
+        endif
+        S_G = abs(S_G) + tiny(1.d0)
+      endif
+      prof0        = S_G**(0.5)
+      dprof0_dpsi  =  0.5 *S_G**(-0.5)*dFmid 
+      dprof0_dpsi2 = -0.25*S_G**(-1.5)*dFmid**2 + 0.5*S_G**(-0.5)*d2Fmid/delta_psi
+      dprof0_dpsi3 = 0.375*S_G**(-2.5)*dFmid**3 &
+      -0.75*S_G**(-1.5)*dFmid*d2Fmid/delta_psi &
+      +0.5 *S_G**(-0.5)*d3Fmid/delta_psi**2
+
       if (F0 .lt. 0.d0) prof0        = - prof0
       if (F0 .lt. 0.d0) dprof0_dpsi  = - dprof0_dpsi 
       if (F0 .lt. 0.d0) dprof0_dpsi2 = - dprof0_dpsi2
       if (F0 .lt. 0.d0) dprof0_dpsi3 = - dprof0_dpsi3
-    endif
-    
-  endif ! end of numerical profile
+      
+    endif ! end of numerical profile
+  endif
 
 
 
@@ -204,6 +231,11 @@ subroutine F_profile(xpoint2,xcase2,Z,Z_xpoint,psi,psi_axis,psi_bnd,&
   FFprime_prof = F_prof * dF_dpsi
   dFF_dpsi     = dF_dpsi * dF_dpsi + F_prof * dF_dpsi2
   dFF_dpsi2    = 3.0 * dF_dpsi * dF_dpsi2 + F_prof * dF_dpsi3
+  if (direct_FF) then
+    FFprime_prof = FFd0
+    dFF_dpsi     = FFd1
+    dFF_dpsi2    = FFd2
+  endif
   dFF_dz       = 0.d0
   dFF_dz2      = 0.d0
   dFF_dpsi_dz  = 0.d0
@@ -299,8 +331,8 @@ subroutine F_profile(xpoint2,xcase2,Z,Z_xpoint,psi,psi_axis,psi_bnd,&
   
   end if
 
-  ! --- Normally not needed since we don't allow FF_1 with model710
-  FFprime_prof = FFprime_prof + FF_1
+  ! ! --- Normally not needed since we don't allow FF_1 with model710
+  ! FFprime_prof = FFprime_prof + FF_1
 
   return
 end subroutine F_profile
@@ -467,7 +499,8 @@ subroutine integrate_F_profile()
   integral_large = integral_large + diff
     
   ! --- Squared root profile (because FF' = 1/2(F**2)' )
-  integral_large(1:n_integral) = integral_large(1:n_integral)**0.5
+  ! integral_large(1:n_integral) = integral_large(1:n_integral)**0.5
+  integral_large(1:n_integral) = integral_large(1:n_integral) - F0**2
   
   ! --- With refined profile, interpolate n_Fprofile_internal on interval psi_n=[0.0,Fprofile_psi_max]
   j_prev = 2
@@ -487,8 +520,8 @@ subroutine integrate_F_profile()
     endif
   enddo
   
-  ! --- Correct the sign of F-profile depending on F0
-  if (F0 .lt. 0.d0) Fprofile_internal = - Fprofile_internal
+  ! ! --- Correct the sign of F-profile depending on F0
+  ! if (F0 .lt. 0.d0) Fprofile_internal = - Fprofile_internal
   
   deallocate(integral_large)
   deallocate(psi_large)
