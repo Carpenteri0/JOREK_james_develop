@@ -1,6 +1,7 @@
 !> Module containing the base functionality for the initialization of particles in 
 !> configuration space (6D) by rejection sampling
 module initialisers_base
+  use mod_particle_sim
   use mod_rng
   use data_structure
   use mod_particle_types
@@ -13,7 +14,7 @@ module initialisers_base
   public set_velocity_from_T, domain_bounding_box, initialise_particles_H_mu_psi
   public initialise_particles_H_mu_psi_phiplanes
   public set_particle_weights_canonical_maxwellian, normalize_with_projection
-  public weigh_with_interp_f
+  public weigh_with_interp_f, initialise_particles_slowing_down
   public normalize_with_projection_at_gc
   public real_f,real_arr_inout_s,part_inout_s,initialise_particles_in_phase_space
 
@@ -1792,4 +1793,206 @@ subroutine set_velocity_from_T(particles, mass, node_list, element_list, cor, v_
     end select
   end do
 end subroutine set_velocity_from_T
+
+
+subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
+  use mpi
+  use mod_random_seed
+  use mod_interp
+  use mod_fields
+  use mod_pcg32_rng
+  use mod_pusher_tools
+  use mod_sampling
+  !use mod_bors
+  use phys_module, only: F0
+  !$ use omp_lib
+
+  implicit none
+
+  class(particle_sim), intent(inout) :: sim
+  integer,             intent(in)    :: group_num
+  class(spatial_pdf),  intent(in)    :: space_pdf !> Spatial rejection function
+  real*8,              intent(in)    :: v_max     !> Maximum velocity in dist
+
+  !> internal vars
+  class(type_rng), dimension(:), allocatable :: rng                             !> ran no. generator
+  real*8                       :: ran(8)                                        !> ran no.
+  real*8                       :: PitchBox(2), vBox(2), Rbox(2), ZBox(2)        !> bounding boxes
+  real*8                       :: v_c, f_v, heaviside, pdf_peak, v_peak         !> slowing-down dist vars
+  real*8                       :: R, Z, phi, s, t, f_x                          !> real-space coords
+  real*8                       :: v(3), v_mag, pitch, gyro_angle, v_par, v_perp !> phase-space coords
+  real*8                       :: dummy_R, dummy_Z
+  real*8                       :: E(3), B(3), psi, U                            !> fields at particle position
+  real*8                       :: B_norm(3), e1(3), e2(3)  
+  logical                      :: use_rej, accepted
+  integer                      :: i_part, n_particles                           !> for particle number indexing
+  integer                      :: tid, ierr, ifail, i_elm                       !> thread-id (omp), mpi error code, subroutine error code
+  real*8,  allocatable         :: stored_x(:,:), stored_v(:,:), stored_st(:,:)  !> for storing particle quantites
+  integer, allocatable         :: stored_ielm(:)
+
+  !> debug vars
+  real*8 :: Fprof
+  real*8 :: P(3), P_s(3), P_t(3), P_phi(3)
+  real*8 :: R_i, R_s, R_t, Z_i, Z_s, Z_t
+  real*8 :: inv_st_jac
+  real*8 :: A3_R, A3_Z, AR_Z, AR_p, AZ_R, AZ_p
+
+  !> header print
+  if (sim%my_id .eq. 0) then 
+    write(*,*) "=== Initialising particles with a slowing-down distribution ==="
+    write(*,*) 'time, time_now, time_prev, static :', sim%time, sim%fields%static  ! plus time_now/time_prev from the linear fields object
+  endif
+
+
+  !> is there a spatial pdf?
+  use_rej = associated(space_pdf%f)
+
+  !> init slowing down dist values
+  v_c      = 0.58d0*v_max
+  v_peak   = 2**(1.d0/3.d0)*v_c  
+  pdf_peak = v_peak**2 / (v_peak**3 + v_c**3)
+  if (sim%my_id .eq. 0) write(*,*) "DEBUG : pdf_peak = ", pdf_peak
+
+
+  !> init arrays
+  n_particles = size(sim%groups(group_num)%particles(:))
+  allocate(stored_x(3,  n_particles))
+  allocate(stored_v(3,  n_particles))
+  allocate(stored_st(2, n_particles))
+  allocate(stored_ielm( n_particles))
+
+  !> define bounding boxes
+  call domain_bounding_box(sim%fields%node_list, sim%fields%element_list, RBox(1), RBox(2), ZBox(1), ZBox(2))
+  PitchBox(1) = -1.0; PitchBox(2) = 1.0
+  vBox(1)     =  0.0; vBox(2)     = v_max*1.01
+
+  !> init rngs
+  call setup_shared_rngs(7, random_seed(), pcg32_rng(), rng)
+
+  !> omp loop over all particles
+
+  !$omp parallel do default(none) &
+  !$omp shared( sim, rng, n_particles, v_max, v_c, PitchBox,   &
+  !$omp         vBox, Rbox, Zbox, pdf_peak, use_rej, space_pdf, &
+  !$omp         stored_ielm, stored_x, stored_v, stored_st)    &
+  !$omp private(i_part, accepted, tid, ran, R, Z, dummy_R, dummy_Z, &
+  !$omp         phi, v, v_mag, pitch, gyro_angle, s, t, heaviside,  &
+  !$omp         f_v, f_x, E, B, psi, U, B_norm, e1, e2, v_par,      &
+  !$omp         v_perp, i_elm, ifail,                               &
+  !$omp         Fprof, P, P_s, P_t, P_phi, R_i, R_s, R_t, Z_i, Z_s, Z_t, inv_st_jac, A3_R, A3_Z, AR_Z, AR_p, AZ_R, AZ_p)
+
+  do i_part = 1, n_particles
+
+    tid = 1
+    !$ tid = omp_get_thread_num() + 1
+
+    ! MISSING : find st at particle loc
+    !           get magnetic field at particle loc
+    !           distribute velocity coords
+
+    accepted = .false.
+    do while (.not. accepted)
+
+    ! ---- 1. draw uniform random number and convert to coordinates
+      call rng(tid)%next(ran)
+      call transform_uniform_cylindrical(ran(1:3), Rbox, Zbox, [0.d0, TWOPI], R, Z, phi)
+      v_mag      = ran(4) * (vBox(2)     - vBox(1)) + vBox(1) 
+      pitch      = ran(5) * (PitchBox(2) - PitchBox(1)) + PitchBox(1) 
+      gyro_angle = ran(6) * TWOPI
+
+    ! --- 2. Check (R,Z) is inside domain & find local coords
+      call find_RZ(sim%fields%node_list, sim%fields%element_list, &
+                   R, Z, dummy_R, dummy_Z, i_elm, s, t, ifail)
+      if (i_elm .le. 0) cycle
+
+    ! --- 3. Evaluate slowing-down dist for this velocity
+      heaviside = 0.d0
+      if (v_mag .le. v_max) heaviside = 1.d0
+
+      f_v = heaviside*v_mag**2 / (v_mag**3 + v_c**3)
+      f_v = f_v / pdf_peak
+
+      !> reject if ran(7) > p(v)/pdf_peak
+      if (ran(7) .ge. f_v) cycle
+      call sim%fields%calc_F_profile(i_elm, s, t, phi, Fprof) ; write(*,*) Fprof
+      call interp_PRZ(sim%fields%node_list, sim%fields%element_list, i_elm, [1,2,3], 3, &
+                      s, t, phi, P, P_s, P_t, P_phi, R, R_s, R_t, Z, Z_s, Z_t)        ! direct, no time interpolation
+
+      if (i_part .le. 10) then
+        if (sim%my_id .eq. 0) then
+          write(*,*) "DEBUG : i_part = ", i_part, "v = ", v_mag, "f_v = ", f_v, "ran(7) = ", ran(7)
+
+            write(*,*) 'Fprof (at the bad marker) :', Fprof
+            write(*,*) 'direct P, P_s:', P, P_s
+
+        endif
+      endif
+
+    ! --- 4. Evaluate real-space distribution for this position
+      if (use_rej) then
+        f_x = eval_rej_f(sim%fields%node_list, sim%fields%element_list, &
+                         i_elm, s, t, phi, R, Z, space_pdf)
+        
+        !> reject if ran(8) > pdf(x)/max_pdf
+        if (.not. (ran(8) .lt. f_x)) cycle
+      endif
+
+    ! --- 5. Calc velocity components (at this point we have accepted the particle)
+
+      call sim%fields%calc_EBpsiU(sim%time, i_elm, [s, t], phi, E, B, psi, U)
+      ! if (any(B /= B) .or. norm2(B) == 0.d0) then
+      !   write(*,'(A,I8,7ES12.4)') 'bad B: ielm,R,Z,s,t,phi,psi,|B| =', i_elm, R, Z, s, t, phi, psi, norm2(B)
+      !   cycle   ! resample rather than propagate NaN
+      ! endif
+
+
+      B_norm = B / sqrt(dot_product(B, B))
+      v_par  = pitch*v_mag
+      v_perp = v_mag*max(0.d0, sqrt(1 - pitch**2))
+
+      call get_orthonormals(B_norm, e1, e2)
+      v = v_par*B_norm + v_perp*(cos(gyro_angle)*e1 + sin(gyro_angle)*e2)
+
+      if (i_part .le. 10) then
+        if (sim%my_id .eq. 0) then
+          write(*,*) "DEBUG : B = ", B, "B_norm = ", B_norm, "v_par = ", v_par, "v_perp = ", v_perp, "v = ", v
+        endif
+      endif
+
+
+      accepted = .true.
+    enddo !> rejection loop
+
+    ! --- 4. store accepted particles
+    stored_x(:,  i_part)  = [R, Z, phi]
+    stored_v(:,  i_part)  = v
+    stored_st(:, i_part) = [s, t]
+    stored_ielm( i_part)  = i_elm
+
+  enddo !> particle loop
+  !$omp end parallel do
+
+  ! --- 5. Pass stored values to particle object
+  select type(p => sim%groups(group_num)%particles)
+  type is (particle_kinetic_leapfrog)
+    do i_part = 1, n_particles
+      p(i_part)%x      = stored_x(:,  i_part)
+      p(i_part)%v      = stored_v(:,  i_part)
+      p(i_part)%st     = stored_st(:, i_part)
+      p(i_part)%i_elm  = stored_ielm( i_part)
+      p(i_part)%weight = 1.d0
+      p(i_part)%q      = 1.d0
+    enddo
+  class default
+    if (sim%my_id .eq. 0) then
+      write(*,*) "ERROR : initialise_particles_slowing_down only accepts particles of type kinetic_leapfrog"
+    endif
+    call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+  endselect
+
+  !> finalise
+  call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+  deallocate(stored_x, stored_v, stored_st, stored_ielm, rng)
+end subroutine initialise_particles_slowing_down
+
 end module initialisers_base

@@ -87,15 +87,25 @@ module mod_initialise_particles
     select type(particles => sim%groups(group_num)%particles)
     type is (particle_kinetic_relativistic)
       if (trim(config%init_function) /= 're_gaussian') then
-        write(*,*) "ERROR : particle_kinetic_relativistic requred init_function='re_gaussian'"
-        write(*,*) "        got init_function='",trim(config%init_function),"' for group '", trim(config%id), "'"
+        if (sim%my_id .eq. 0) then
+          write(*,*) "ERROR : particle_kinetic_relativistic requred init_function='re_gaussian'"
+          write(*,*) "        got init_function='",trim(config%init_function),"' for group '", trim(config%id), "'"
+        endif
         call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
       endif
     type is (particle_kinetic_leapfrog)
       if (trim(config%init_function) == 're_gaussian') then
-        write(*,*) "ERROR (initialise_group): particle_kinetic_leapfrog incompatible with init_function='re_gaussian'"
+        if (sim%my_id .eq. 0) then
+          write(*,*) "ERROR : particle_kinetic_leapfrog incompatible with init_function='re_gaussian'"
+        endif
         call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
       endif
+    class default
+      if (sim%my_id .eq. 0) then
+        write(*,*) "ERROR : particle type may not be compatible with chosen init_function"
+        write(*,*) "        see subroutine initialise_group in mod_initialise_particles to change behaviour"
+      endif
+      call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
     end select
 
     !> Set real-space pdf
@@ -145,6 +155,12 @@ module mod_initialise_particles
       endif
 
       call initialise_from_EPCoM(sim, group_num)
+
+    !> EPs : slowing down distribution
+    case ('slowing_down')
+      if (sim%my_id == 0) write(*,*) "  Sampler: slowing_down"
+
+      call initialise_particles_slowing_down(sim, 1, space_pdf, v_max=3.9e6)
 
     !> REs : Monoenergetic or Gaussian energy distribution
     case('re_gaussian')

@@ -150,15 +150,17 @@ subroutine calc_EBpsiU(fields, time, i_elm, st, phi, E, B, psi, U)
   AZ_p    = P_phi(3)
   AZ_t    = P_time(3)
 
-  B=[(A3_Z-AZ_p)*R_inv, (AR_p-A3_R)*R_inv, AZ_R-AR_Z + Fprof*R_inv]
-  E=[-AR_t, -AZ_t, -R_inv*A3_t]
+  B   = [(A3_Z-AZ_p)*R_inv, (AR_p-A3_R)*R_inv, AZ_R-AR_Z + Fprof*R_inv]
+  E   = [-AR_t, -AZ_t, -R_inv*A3_t]
+  psi = A3
+  U   = 0   !> Is this good ??
 #else
-#if STELLARATOR_MODEL
-  call fields%interp_PRZP_1(time, i_elm, i_var, 2, st(1), st(2), phi, P, P_s, P_t, P_phi, P_time, R, R_s, R_t, R_phi, Z, Z_s, Z_t, Z_phi)
-#else
-  R_phi = 0.0; Z_phi = 0.0
-  call fields%interp_PRZ(time, i_elm, i_var, 2, st(1), st(2), phi, P, P_s, P_t, P_phi, P_time, R, R_s, R_t, Z, Z_s, Z_t)
-#endif
+  #if STELLARATOR_MODEL
+    call fields%interp_PRZP_1(time, i_elm, i_var, 2, st(1), st(2), phi, P, P_s, P_t, P_phi, P_time, R, R_s, R_t, R_phi, Z, Z_s, Z_t, Z_phi)
+  #else
+    R_phi = 0.0; Z_phi = 0.0
+    call fields%interp_PRZ(time, i_elm, i_var, 2, st(1), st(2), phi, P, P_s, P_t, P_phi, P_time, R, R_s, R_t, Z, Z_s, Z_t)
+  #endif
   ! Calculate the derivatives to R and Z
 
   R_inv = 1.d0/R
@@ -177,24 +179,24 @@ subroutine calc_EBpsiU(fields, time, i_elm, st, phi, E, B, psi, U)
   ! Set dpsi/dt to 0 if flag is true
   if(fields%flag_zero_dpsidt) P_time(1) = 0.d0
 
-#if STELLARATOR_MODEL
-  chi = get_chi(R,Z,phi,fields%node_list,fields%element_list,i_elm,st(1),st(2))
+  #if STELLARATOR_MODEL
+    chi = get_chi(R,Z,phi,fields%node_list,fields%element_list,i_elm,st(1),st(2))
 
-  B = (/ chi(1,0,0)      + (psi_Z*chi(0,0,1) - psi_phi*chi(0,1,0))/(F0*R), &
-         chi(0,1,0)      - (psi_R*chi(0,0,1) - psi_phi*chi(1,0,0))/(F0*R), &
-         chi(0,0,1)/R    + (psi_R*chi(0,1,0) - psi_Z * chi(1,0,0))/F0         /)
-  
-  E     = [-U_R, -U_Z, -U_phi*R_inv]/t_norm
-  E     = E - P_time(1)/F0*(/ chi(1,0,0), chi(0,1,0), chi(0,0,1)*R_inv /) 
-#else
-  ! Calculate the magnetic field (see http://jorek.eu/wiki/doku.php?id=reduced_mhd)
-  B     = [+psi_Z, -psi_R, F0] * R_inv
+    B = (/ chi(1,0,0)      + (psi_Z*chi(0,0,1) - psi_phi*chi(0,1,0))/(F0*R), &
+           chi(0,1,0)      - (psi_R*chi(0,0,1) - psi_phi*chi(1,0,0))/(F0*R), &
+           chi(0,0,1)/R    + (psi_R*chi(0,1,0) - psi_Z * chi(1,0,0))/F0         /)
+    
+    E     = [-U_R, -U_Z, -U_phi*R_inv]/t_norm
+    E     = E - P_time(1)/F0*(/ chi(1,0,0), chi(0,1,0), chi(0,0,1)*R_inv /) 
+  #else
+    ! Calculate the magnetic field (see http://jorek.eu/wiki/doku.php?id=reduced_mhd)
+    B     = [+psi_Z, -psi_R, F0] * R_inv
 
-  ! The local electric field, obtained from E=-Grad (u F0)-\partial_t A
-  ! See http://jorek.eu/wiki/doku.php?id=u_phi
-  E     = [-F0*U_R, -F0*U_Z, -F0*U_phi*R_inv]/t_norm
-  E(3)  = E(3) - R_inv*P_time(1) ! because this is not normalized with t_norm
-#endif
+    ! The local electric field, obtained from E=-Grad (u F0)-\partial_t A
+    ! See http://jorek.eu/wiki/doku.php?id=u_phi
+    E     = [-F0*U_R, -F0*U_Z, -F0*U_phi*R_inv]/t_norm
+    E(3)  = E(3) - R_inv*P_time(1) ! because this is not normalized with t_norm
+  #endif
 
 #endif
 

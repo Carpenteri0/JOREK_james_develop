@@ -4,7 +4,6 @@ module mod_neutral_density
     use mod_interp, only: mode_moivre
     use mod_basisfunctions
     use particle_tracer
-    use phys_module, only: n_part_groups
     !$ use omp_lib
   
     implicit none
@@ -17,6 +16,7 @@ contains
 
 !> first calculates the neutral density from all particles with ncs, then projects it
 subroutine get_neutral_density(sim, neutral_density_proj)
+  use phys_module, only: n_part_groups
   implicit none
 
   class(particle_sim), target, intent(inout)                :: sim
