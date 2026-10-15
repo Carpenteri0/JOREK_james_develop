@@ -96,6 +96,7 @@ module mod_rej_f
     !>
     !> Recongnised names:
     !>    'itpa_tae'        - reproduce EP dist in ITPA TAE benchmark
+    !>    'exp_psin'        - weight by exp(-psi_n/0.25)
     !>    'RZ'              - weight by 1/(1+r_minor)^2
     !>    'analytical'      - weight by (1-(r/a)^2)^nu
     !>    'current'         - weight by normalised j_tor
@@ -117,6 +118,11 @@ module mod_rej_f
         case('itpa_tae')
             pdf%f          => itpa_tae_pdf
             pdf%vars       =  [var_psi]
+            pdf%needs_grad = .false.
+
+        case('exp_psin')
+            pdf%f          => exp_psin_pdf
+            pdf%vars       = [var_psi]
             pdf%needs_grad = .false.
         
         case('RZ')
@@ -238,62 +244,62 @@ module mod_rej_f
     !> gradP is (d/dR, d/dZ, d/dphi) and is set to zero when needs_grad is .false.
     pure function eval_rej_f(node_list, element_list, i_elm, s, t, phi, R, Z, space_pdf) result(f)
 
-    !> i/o vars
-    type(type_node_list),    intent(in)  :: node_list
-    type(type_element_list), intent(in)  :: element_list
-    integer,                 intent(in)  :: i_elm
-    real*8,                  intent(in)  :: s, t       !> local element coordinates
-    real*8,                  intent(in)  :: R, Z, phi  !> global cylindrical coordinates
-    type(spatial_pdf),       intent(in)  :: space_pdf
-    real*4                               :: f          !> acceptance probability
-    
-    !> internal vars
-    real*8, parameter :: EPS_JAC = 1.d-12    !> below this element is degenerate
-    integer           :: n_geom, n_mhd, k
-    real*8            :: P(size(space_pdf%vars)), gradP(3,size(space_pdf%vars))
-    real*8            :: P_s(count(space_pdf%vars > 0)), P_t(count(space_pdf%vars > 0))
-    real*8            :: P_phi(count(space_pdf%vars > 0))
-    real*8            :: R_i, R_S, R_t, Z_i, Z_s, Z_t, xjac, inv_xjac
+        !> i/o vars
+        type(type_node_list),    intent(in)  :: node_list
+        type(type_element_list), intent(in)  :: element_list
+        integer,                 intent(in)  :: i_elm
+        real*8,                  intent(in)  :: s, t       !> local element coordinates
+        real*8,                  intent(in)  :: R, Z, phi  !> global cylindrical coordinates
+        type(spatial_pdf),       intent(in)  :: space_pdf
+        real*4                               :: f          !> acceptance probability
 
-    n_mhd  = count(space_pdf%vars > 0)
-    n_geom = size(space_pdf%vars) - n_mhd
-    gradP  = 0.d0
+        !> internal vars
+        real*8, parameter :: EPS_JAC = 1.d-12    !> below this element is degenerate
+        integer           :: n_geom, n_mhd, k
+        real*8            :: P(size(space_pdf%vars)), gradP(3,size(space_pdf%vars))
+        real*8            :: P_s(count(space_pdf%vars > 0)), P_t(count(space_pdf%vars > 0))
+        real*8            :: P_phi(count(space_pdf%vars > 0))
+        real*8            :: R_i, R_S, R_t, Z_i, Z_s, Z_t, xjac, inv_xjac
 
-    !> Geomteric vars
-    do k = 1, n_geom
-        select case (space_pdf%vars(k))
-        case(0);  P(k) = 1.d0
-        case(-1); P(k) = R   ; if (space_pdf%needs_grad) gradP(1,k) = 1.d0
-        case(-2); P(k) = Z   ; if (space_pdf%needs_grad) gradP(2,k) = 1.d0
-        case(-3); P(k) = phi ; if (space_pdf%needs_grad) gradP(3,k) = 1.d0
-        endselect
-    enddo
+        n_mhd  = count(space_pdf%vars > 0)
+        n_geom = size(space_pdf%vars) - n_mhd
+        gradP  = 0.d0
 
-    !> MHD Variables : values only unless the rej_f asked for gradients
-    !> interpolated within the element
-    if (n_mhd .ge. 1) then
-        if (space_pdf%needs_grad) then
-        call interp_PRZ(node_list, element_list, i_elm, space_pdf%vars(n_geom+1:), n_mhd, &
-            s, t, phi, P(n_geom+1:), P_s, P_t, P_phi, R_i, R_s, R_t, Z_i, Z_s, Z_t)
-
-        !> interp_PRZ gives s,t derivatives - transform to R,Z
-        !> degenerate element (e.g axis point) -> leave gradient zero
-        xjac     = R_s*Z_t - R_t*Z_s
-        inv_xjac = 0.d0
-        if (abs(xjac) > EPS_JAC) inv_xjac = 1.d0/xjac
-
-        do k = 1, n_mhd
-            gradP(1,n_geom+k) = ( Z_t*P_s(k) - Z_s*P_t(k)) * inv_xjac
-            gradP(2,n_geom+k) = (-R_t*P_s(k) + R_s*P_t(k)) * inv_xjac
-            gradP(3,n_geom+k) = P_phi(k)
+        !> Geomteric vars
+        do k = 1, n_geom
+            select case (space_pdf%vars(k))
+            case(0);  P(k) = 1.d0
+            case(-1); P(k) = R   ; if (space_pdf%needs_grad) gradP(1,k) = 1.d0
+            case(-2); P(k) = Z   ; if (space_pdf%needs_grad) gradP(2,k) = 1.d0
+            case(-3); P(k) = phi ; if (space_pdf%needs_grad) gradP(3,k) = 1.d0
+            endselect
         enddo
-        else
-        call interp_PRZ(node_list, element_list, i_elm, space_pdf%vars(n_geom+1:), n_mhd, &
-            s, t, phi, P(n_geom+1:), R_i, Z_i)
-        endif
-    endif
 
-    f = space_pdf%f(size(space_pdf%vars), P, gradP)
+        !> MHD Variables : values only unless the rej_f asked for gradients
+        !> interpolated within the element
+        if (n_mhd .ge. 1) then
+            if (space_pdf%needs_grad) then
+                call interp_PRZ(node_list, element_list, i_elm, space_pdf%vars(n_geom+1:), n_mhd, &
+                    s, t, phi, P(n_geom+1:), P_s, P_t, P_phi, R_i, R_s, R_t, Z_i, Z_s, Z_t)
+
+                !> interp_PRZ gives s,t derivatives - transform to R,Z
+                !> degenerate element (e.g axis point) -> leave gradient zero
+                xjac     = R_s*Z_t - R_t*Z_s
+                inv_xjac = 0.d0
+                if (abs(xjac) > EPS_JAC) inv_xjac = 1.d0/xjac
+
+                do k = 1, n_mhd
+                    gradP(1,n_geom+k) = ( Z_t*P_s(k) - Z_s*P_t(k)) * inv_xjac
+                    gradP(2,n_geom+k) = (-R_t*P_s(k) + R_s*P_t(k)) * inv_xjac
+                    gradP(3,n_geom+k) = P_phi(k)
+                enddo
+            else
+                call interp_PRZ(node_list, element_list, i_elm, space_pdf%vars(n_geom+1:), n_mhd, &
+                    s, t, phi, P(n_geom+1:), R_i, Z_i)
+            endif
+        endif
+
+        f = space_pdf%f(size(space_pdf%vars), P, gradP)
     end function eval_rej_f
 
 
@@ -326,6 +332,24 @@ module mod_rej_f
 
         f = real(coeff(3)*exp(-coeff(2)/coeff(1)*(tanh((sqrt(s)-coeff(0))/coeff(2)))), 4)
     end function itpa_tae_pdf
+
+    !> rejection function based off exponential drop-off in psi_n
+    !> TODO : GIVE REF
+    pure function exp_psin_pdf(n, P, gradP) result(f)
+        integer,                intent(in) :: n
+        real*8, dimension(n),   intent(in) :: P
+        real*8, dimension(3,n), intent(in) :: gradP
+        real*4                             :: f
+
+        !> internal vars
+        real*8 :: psi_norm
+
+        !> normalise psi
+        psi_norm = max((P(1) - ES%Psi_axis) / (ES%Psi_bnd - ES%Psi_axis), 0.d0)
+
+        !> eval pdf
+        f = exp(-psi_norm/0.25d0)
+    end function exp_psin_pdf
 
     !> Weight as 1/(1 + r_minor)^2 - broad profile peaked on axis
     !>

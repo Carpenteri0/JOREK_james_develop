@@ -142,6 +142,12 @@ module mod_initialise_particles
         "experimental_dist.h5", pcg32_rng(), sim%groups(group_num)%mass, &
         n_phi_planes_in=config%n_phi_planes, fraction_phi_planes=1.d0)
 
+    !> EPs : slowing down distribution
+    case ('slowing_down')
+      if (sim%my_id == 0) write(*,*) "  Sampler: slowing_down"
+
+      call initialise_particles_slowing_down(sim, 1, space_pdf, v_max=3.9e6)
+
     !> REs : Monoenergetic or Gaussian energy distribution
     case('re_gaussian')
       if (sim%my_id == 0) then
