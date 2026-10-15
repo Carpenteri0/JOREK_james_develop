@@ -1830,16 +1830,28 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
   real*8,  allocatable         :: stored_x(:,:), stored_v(:,:), stored_st(:,:)  !> for storing particle quantites
   integer, allocatable         :: stored_ielm(:)
 
+  !> debug vars
+  real*8 :: Fprof
+  real*8 :: P(3), P_s(3), P_t(3), P_phi(3)
+  real*8 :: R_i, R_s, R_t, Z_i, Z_s, Z_t
+  real*8 :: inv_st_jac
+  real*8 :: A3_R, A3_Z, AR_Z, AR_p, AZ_R, AZ_p
+
   !> header print
-  if (sim%my_id .eq. 0) write(*,*) "=== Initialising particles with a slowing-down distribution ==="
+  if (sim%my_id .eq. 0) then 
+    write(*,*) "=== Initialising particles with a slowing-down distribution ==="
+    write(*,*) 'time, time_now, time_prev, static :', sim%time, sim%fields%static  ! plus time_now/time_prev from the linear fields object
+  endif
+
 
   !> is there a spatial pdf?
   use_rej = associated(space_pdf%f)
 
   !> init slowing down dist values
   v_c      = 0.58d0*v_max
-  v_peak   = 2**(1/3)*v_c  
+  v_peak   = 2**(1.d0/3.d0)*v_c  
   pdf_peak = v_peak**2 / (v_peak**3 + v_c**3)
+  if (sim%my_id .eq. 0) write(*,*) "DEBUG : pdf_peak = ", pdf_peak
 
 
   !> init arrays
@@ -1866,7 +1878,8 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
   !$omp private(i_part, accepted, tid, ran, R, Z, dummy_R, dummy_Z, &
   !$omp         phi, v, v_mag, pitch, gyro_angle, s, t, heaviside,  &
   !$omp         f_v, f_x, E, B, psi, U, B_norm, e1, e2, v_par,      &
-  !$omp         v_perp, i_elm, ifail)
+  !$omp         v_perp, i_elm, ifail,                               &
+  !$omp         Fprof, P, P_s, P_t, P_phi, R_i, R_s, R_t, Z_i, Z_s, Z_t, inv_st_jac, A3_R, A3_Z, AR_Z, AR_p, AZ_R, AZ_p)
 
   do i_part = 1, n_particles
 
@@ -1900,7 +1913,20 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
       f_v = f_v / pdf_peak
 
       !> reject if ran(7) > p(v)/pdf_peak
-      if (ran(7) .gt. f_v) cycle
+      if (ran(7) .ge. f_v) cycle
+      call sim%fields%calc_F_profile(i_elm, s, t, phi, Fprof) ; write(*,*) Fprof
+      call interp_PRZ(sim%fields%node_list, sim%fields%element_list, i_elm, [1,2,3], 3, &
+                      s, t, phi, P, P_s, P_t, P_phi, R, R_s, R_t, Z, Z_s, Z_t)        ! direct, no time interpolation
+
+      if (i_part .le. 10) then
+        if (sim%my_id .eq. 0) then
+          write(*,*) "DEBUG : i_part = ", i_part, "v = ", v_mag, "f_v = ", f_v, "ran(7) = ", ran(7)
+
+            write(*,*) 'Fprof (at the bad marker) :', Fprof
+            write(*,*) 'direct P, P_s:', P, P_s
+
+        endif
+      endif
 
     ! --- 4. Evaluate real-space distribution for this position
       if (use_rej) then
@@ -1908,12 +1934,17 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
                          i_elm, s, t, phi, R, Z, space_pdf)
         
         !> reject if ran(8) > pdf(x)/max_pdf
-        if (ran(8) .ge. f_x) cycle
+        if (.not. (ran(8) .lt. f_x)) cycle
       endif
 
     ! --- 5. Calc velocity components (at this point we have accepted the particle)
 
       call sim%fields%calc_EBpsiU(sim%time, i_elm, [s, t], phi, E, B, psi, U)
+      ! if (any(B /= B) .or. norm2(B) == 0.d0) then
+      !   write(*,'(A,I8,7ES12.4)') 'bad B: ielm,R,Z,s,t,phi,psi,|B| =', i_elm, R, Z, s, t, phi, psi, norm2(B)
+      !   cycle   ! resample rather than propagate NaN
+      ! endif
+
 
       B_norm = B / sqrt(dot_product(B, B))
       v_par  = pitch*v_mag
@@ -1921,6 +1952,12 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
 
       call get_orthonormals(B_norm, e1, e2)
       v = v_par*B_norm + v_perp*(cos(gyro_angle)*e1 + sin(gyro_angle)*e2)
+
+      if (i_part .le. 10) then
+        if (sim%my_id .eq. 0) then
+          write(*,*) "DEBUG : B = ", B, "B_norm = ", B_norm, "v_par = ", v_par, "v_perp = ", v_perp, "v = ", v
+        endif
+      endif
 
 
       accepted = .true.
@@ -1943,7 +1980,8 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
       p(i_part)%v      = stored_v(:,  i_part)
       p(i_part)%st     = stored_st(:, i_part)
       p(i_part)%i_elm  = stored_ielm( i_part)
-      p(i_part)%weight = 1.0
+      p(i_part)%weight = 1.d0
+      p(i_part)%q      = 1.d0
     enddo
   class default
     if (sim%my_id .eq. 0) then
