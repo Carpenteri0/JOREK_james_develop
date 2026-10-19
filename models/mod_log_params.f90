@@ -238,6 +238,8 @@ write(*,'(1x,a)',advance='no') ' USE_DOMM            : '
   else
     write(*,'(3x,a)') '=> no-fft version of element_matrix is used'
   end if
+  write(*,LOGI_FMT) 'intg_original_grids   ', intg_original_grids
+  write(*,REAL_FMT) 'Fprofile_psi_max      ', Fprofile_psi_max
   write(*,REAL_FMT) 'tstep                 ', tstep
   write(*,INTG_FMT) 'nstep                 ', nstep
   write(*,REAL_FMT) 'tstep_n               ', tstep_n

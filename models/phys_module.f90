@@ -787,14 +787,16 @@ module phys_module
   real*8  :: nu_phi_source                  !< Friction coefficient of the n=0 background potential profile source term (>~ visco)
 
   !> @name Numerical input profile for Fprofile
-  integer, parameter  :: n_Fprofile_internal_max = 300                 !< INTERNAL Max Size of F-profile
-  integer             :: n_Fprofile_internal                           !< INTERNAL Size of F-profile
-  real*8              :: Fprofile_internal   (n_Fprofile_internal_max) !< INTERNAL F-profile, from  FFprime integration
-  real*8              :: Fprofile_internal_d1(n_Fprofile_internal_max) !< INTERNAL F-profile, from  FFprime integration (first derivative)
-  real*8              :: Fprofile_internal_d2(n_Fprofile_internal_max) !< INTERNAL F-profile, from  FFprime integration (second derivative)
-  real*8              :: Fprofile_internal_d3(n_Fprofile_internal_max) !< INTERNAL F-profile, from  FFprime integration (third derivative)
-  real*8              :: Fprofile_psi_max                              !< INTERNAL max psi_norm of F-profile
-  real*8              :: Fprofile_tolerance                            !< INTERNAL tolerance (in %) for accuracy of F-profile compared to input FFprime
+  integer, parameter  :: n_Fprofile_internal_max = 2000                 !< INTERNAL Max Size of F-profile
+  integer             :: n_Fprofile_internal                            !< INTERNAL Size of F-profile, shoud be smaller than n_Fprofile_internal_max
+  real*8              :: Fprofile_internal_psi(n_Fprofile_internal_max) !< INTERNAL F-profile, from  FFprime integration
+  real*8              :: Fprofile_internal    (n_Fprofile_internal_max) !< INTERNAL F-profile, from  FFprime integration
+  real*8              :: Fprofile_internal_d1 (n_Fprofile_internal_max) !< INTERNAL F-profile, from  FFprime integration (first derivative)
+  real*8              :: Fprofile_internal_d2 (n_Fprofile_internal_max) !< INTERNAL F-profile, from  FFprime integration (second derivative)
+  real*8              :: Fprofile_internal_d3 (n_Fprofile_internal_max) !< INTERNAL F-profile, from  FFprime integration (third derivative)
+  real*8              :: Fprofile_psi_max                               !< INTERNAL max psi_norm of F-profile
+  real*8              :: Fprofile_tolerance                             !< INTERNAL tolerance (in %) for accuracy of F-profile compared to input FFprime
+  logical             :: intg_original_grids                            !< Use original grids for FFprime integration
 
   !> @name Analytical input profile for FFprime
   real*8  :: FF_0              !< FF' value in the plasma center

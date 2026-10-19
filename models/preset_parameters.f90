@@ -600,9 +600,10 @@ subroutine preset_parameters
   domm_file          = 'none'
   normalized_velocity_profile = .true.
 
-  n_Fprofile_internal = 300 ! model710 only: size of internal numerical F-profile
+  n_Fprofile_internal = 300 ! model710 only: size of internal numerical F-profile, should be smaller than n_Fprofile_internal_max
   Fprofile_psi_max    = 1.5 ! model710 only: max-psi_norm of internal numerical F-profile
   Fprofile_tolerance  = 1.0 ! model710 only: tolerance of average different between final FFprime and requested FFprime
+  intg_original_grids = .f. ! Use original grids for FFprime integration
 
   produce_live_data  = .true.
   
