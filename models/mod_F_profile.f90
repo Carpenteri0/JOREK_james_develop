@@ -498,6 +498,22 @@ subroutine integrate_F_profile()
 end subroutine integrate_F_profile
 
 
+!> We integrate ffprime on the psi_n grid, from the boundary inwards st. 
+!> the integral is zero at psi_n = 1. This integral can be written as
+!>      intg_ffprime = (psi_bnd - psi_ax)^(-1) * (F^2(psi_n) - F0^2)
+!> where F0 is F at psi_n=1 - vacuum field. We make no attempt to find
+!> F at this stage as we don't yet know psi_bnd or psi_ax
+subroutine integrate_ffprime()
+
+  use phys_module, only: xpoint, F0, FF_0, FF_1, FF_coef, intg_ffprime_len
+  use phys_module, only: intg_ffprime_x, intg_ffprime_y0, num_ffprime
+
+  !> internal vars
+  integer :: i
+  real*8  :: integrand, dpsi_n
+
+  !> Loop over psi_n backwards
+  
 
 
 
