@@ -121,6 +121,8 @@ subroutine read_num_profiles(my_id)
       call derivProf(intg_ffprime_x, intg_ffprime_y0, intg_ffprime_len, intg_ffprime_y1)
       call derivProf(intg_ffprime_x, intg_ffprime_y1, intg_ffprime_len, intg_ffprime_y2)
       call derivProf(intg_ffprime_x, intg_ffprime_y2, intg_ffprime_len, intg_ffprime_y3)
+
+      !> SHOULD CHECK INTEGRATION HERE
     else
       call readProf(num_Fprofile_x, num_Fprofile_y0, num_Fprofile_len, Fprofile_file)
       call check_num_prof(num_Fprofile, num_Fprofile_x, num_Fprofile_y0, num_Fprofile_len, 'Fprofile',    &

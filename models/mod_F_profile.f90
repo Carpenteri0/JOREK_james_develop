@@ -145,22 +145,22 @@ subroutine F_profile(xpoint2,xcase2,Z,Z_xpoint,psi,psi_axis,psi_bnd,&
   
     ! --- Interpolate profile and derivatives to position psi_n by bisections.
     left  = 1
-    right = num_Fprofile_len
+    right = intg_ffprime_len
     do
       if ( right == left + 1 ) exit
       mid = (left + right) / 2
-      if ( num_Fprofile_x(mid) >= psi_n ) then
+      if ( intg_ffprime_x(mid) >= psi_n ) then
         right = mid
       else
         left = mid
       end if
     end do
-    aux1 = (psi_n - num_Fprofile_x(left)) / (num_Fprofile_x(right) - num_Fprofile_x(left))
+    aux1 = (psi_n - intg_ffprime_len(left)) / (intg_ffprime_len(right) - intg_ffprime_len(left))
     aux2 = (1. - aux1)
-    Fmid   = num_Fprofile_y0(left) * aux2 + num_Fprofile_y0(right) * aux1
-    dFmid  = num_Fprofile_y1(left) * aux2 + num_Fprofile_y1(right) * aux1
-    d2Fmid = num_Fprofile_y2(left) * aux2 + num_Fprofile_y2(right) * aux1
-    d3Fmid = num_Fprofile_y3(left) * aux2 + num_Fprofile_y3(right) * aux1
+    Fmid   = intg_ffprime_y0(left) * aux2 + intg_ffprime_y0(right) * aux1
+    dFmid  = intg_ffprime_y1(left) * aux2 + intg_ffprime_y1(right) * aux1
+    d2Fmid = intg_ffprime_y2(left) * aux2 + intg_ffprime_y2(right) * aux1
+    d3Fmid = intg_ffprime_y3(left) * aux2 + intg_ffprime_y3(right) * aux1
     
     ! --- When using numerical F-profile, no need to denormalise
     if (num_Fprofile) then
@@ -168,31 +168,39 @@ subroutine F_profile(xpoint2,xcase2,Z,Z_xpoint,psi,psi_axis,psi_bnd,&
       dprof0_dpsi  = dFmid
       dprof0_dpsi2 = d2Fmid
       dprof0_dpsi3 = d3Fmid
-    ! --- It's not F' that we integrate in the routine "integrate_F_profile"
-    ! --- It's (F^2)', and therefore the denormalisation is not just a matter of a factor delta_psi
+    
+    ! --- integrate_ffprime gives us 1/delta_psi * (F^2(psi_n) - F0^2)
+    ! --- therefore need to rescale intg_ffprime_yX to get F-profile
     else
-      if (F0 .lt. 0.d0) Fmid   = - Fmid  
-      if (F0 .lt. 0.d0) dFmid  = - dFmid 
-      if (F0 .lt. 0.d0) d2Fmid = - d2Fmid
-      if (F0 .lt. 0.d0) d3Fmid = - d3Fmid
-      prof0        = + ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(+0.5)
-      dprof0_dpsi  = + ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-0.5) * (Fmid * dFmid)
-      dprof0_dpsi2 = - ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-1.5) * (Fmid * dFmid)**2 &
-                     + ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-0.5) * (dFmid**2 + Fmid * d2Fmid) / delta_psi
-      dprof0_dpsi3 = + 3 * ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-2.5) * (Fmid * dFmid)**3 &
-                     - ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-1.5) * ( (2 * d2Fmid * dFmid * Fmid**2) + 2 * (dFmid**3 * Fmid)) / delta_psi &
-                     - ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-1.5) * ((dFmid**3) * Fmid + d2Fmid * dFmid * Fmid**2) / delta_psi &
-                     + ( delta_psi * (Fmid**2 - F0**2) + F0**2 ) ** (-0.5) * ( (3 * dFmid * d2Fmid) + (Fmid * d3Fmid) ) / (delta_psi)**2
-      if (F0 .lt. 0.d0) prof0        = - prof0
-      if (F0 .lt. 0.d0) dprof0_dpsi  = - dprof0_dpsi 
-      if (F0 .lt. 0.d0) dprof0_dpsi2 = - dprof0_dpsi2
-      if (F0 .lt. 0.d0) dprof0_dpsi3 = - dprof0_dpsi3
+      prof0        = (delta_psi*Fmid + F0**2)**(1/2)
+      dprof0_dpsi  =  dFmid / (2*prof0)
+      dprof0_dpsi2 = (d2Fmid/(2*delta_psi   ) - (dprof0_dpsi)**2          ) / prof0
+      dprof0_dpsi3 = (d3Fmid/(2*delta_psi**2) - 3*dprof0_dpsi*dprof0_dpsi2) / prof0
+    
+      if (F0 .lt. 0.d0) then 
+        prof0        = - prof0
+        dprof0_dpsi  = - dprof0_dpsi 
+        dprof0_dpsi2 = - dprof0_dpsi2
+        dprof0_dpsi3 = - dprof0_dpsi3
+      endif
+
+
+      ! if (F0 .lt. 0.d0) Fmid   = - Fmid  
+      ! if (F0 .lt. 0.d0) dFmid  = - dFmid 
+      ! if (F0 .lt. 0.d0) d2Fmid = - d2Fmid
+      ! if (F0 .lt. 0.d0) d3Fmid = - d3Fmid
+      ! prof0        = + ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(+0.5)
+      ! dprof0_dpsi  = + ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-0.5) * (Fmid * dFmid)
+      ! dprof0_dpsi2 = - ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-1.5) * (Fmid * dFmid)**2 &
+      !                + ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-0.5) * (dFmid**2 + Fmid * d2Fmid) / delta_psi
+      ! dprof0_dpsi3 = + 3 * ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-2.5) * (Fmid * dFmid)**3 &
+      !                - ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-1.5) * ( (2 * d2Fmid * dFmid * Fmid**2) + 2 * (dFmid**3 * Fmid)) / delta_psi &
+      !                - ( delta_psi * (Fmid**2 - F0**2) + F0**2 )**(-1.5) * ((dFmid**3) * Fmid + d2Fmid * dFmid * Fmid**2) / delta_psi &
+      !                + ( delta_psi * (Fmid**2 - F0**2) + F0**2 ) ** (-0.5) * ( (3 * dFmid * d2Fmid) + (Fmid * d3Fmid) ) / (delta_psi)**2
+
     endif
     
   endif ! end of numerical profile
-
-
-
 
   ! --- Save F-profile
   F_prof    = + prof0
@@ -207,7 +215,6 @@ subroutine F_profile(xpoint2,xcase2,Z,Z_xpoint,psi,psi_axis,psi_bnd,&
   dFF_dz       = 0.d0
   dFF_dz2      = 0.d0
   dFF_dpsi_dz  = 0.d0
-
 
   ! --- Cut-off at plasma edge
   if (force_analytical) then 
@@ -505,14 +512,37 @@ end subroutine integrate_F_profile
 !> F at this stage as we don't yet know psi_bnd or psi_ax
 subroutine integrate_ffprime()
 
-  use phys_module, only: xpoint, F0, FF_0, FF_1, FF_coef, intg_ffprime_len
-  use phys_module, only: intg_ffprime_x, intg_ffprime_y0, num_ffprime
+  use phys_module, only: xpoint, F0, FF_0, FF_1, FF_coef
+  use phys_module, only: num_ffprime, num_ffprime_len, num_ffprime_x, num_ffprime_y0
+  use phys_module, only: intg_ffprime_len, intg_ffprime_x, intg_ffprime_y0
 
   !> internal vars
   integer :: i
   real*8  :: integrand, dpsi_n
 
+  !> save psi_n grid from ffprime to integrated profile
+  intg_ffprime_len = num_ffprime_len
+  intg_ffprime_x(1:intg_ffprime_len) = num_ffprime_x(1:intg_ffprime_len)
+
+  !> init integral
+  intg_ffprime_y0(intg_ffprime_len) = 0.d0
+  integrand                         = 0.d0
+  dpsi_n                            = 0.d0
+
   !> Loop over psi_n backwards
+  do i = 1, intg_ffprime_len - 1, 1, -1
+
+    !> integrate using trapezium rule.
+    !> ignore factor of 1/2 as it shows up in FF' = 1/2 d/dpsi(F^2)
+    integrand = num_ffprime_y0(i+1) + num_ffprime_y0(i)
+    dpsi_n    = intg_ffprime_x(i+1) - intg_ffprime_x(i)
+
+    intg_ffprime_y0(i) = intg_ffprime_y0(i+1) + integrand*dpsi_n
+  enddo
+
+  !> COULD ADD A FILE WRITE HERE
+end subroutine integrate_ffprime
+    
   
 
 

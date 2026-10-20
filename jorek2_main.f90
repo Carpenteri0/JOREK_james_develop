@@ -181,6 +181,11 @@ program JOREK2
   type(type_SP_MATRIX)        :: a_mat
   type(type_RHS)              :: rhs_vec, deltas
   type(type_SP_SOLVER)        :: solver
+
+
+  !> DEBUG F PROFILE
+  real*8  :: F2profile(intg_ffprime_len)
+  integer :: iu
  
   call init_expr()
   allocate(res(exprs_all_int%n_expr+1))
@@ -480,6 +485,27 @@ mpi_required = 0
   
   ! --- Print some grid information
   if ( my_id == 0 ) call log_grid_info(.false., node_list, element_list)
+
+  ! --- Make Fprofile file
+  if (my_id .eq. 0) then
+
+    do i = 1, intg_ffprime_len
+      F2profile(i) = ((ES%psi_bnd - ES%psi_axis)*intg_ffprime_y0(i) + F0**2)
+    enddo
+
+    write(*,*) "DEBUG : intg_ffprime_len : ", intg_ffprime_len
+    write(*,*) "        delta_psi        : ", ES%psi_bnd - ES%psi_axis
+    write(*,*) "        min/max F^2      : ", min(F_profile), max(F_profile)
+
+    open(newunit=iu, file="F2_profile.dat", status="replace", action="write")
+    write(iu, '(A)') "# psi_n  F**2"
+    do i = 1, intg_ffprime_len
+      write(iu, '(2ES16.7)') intg_ffprime_x(i), F2profile(i)
+    enddo
+    close(iu)
+  endif
+    
+
   
 #if STELLARATOR_MODEL
   if (my_id .eq. 0 .and. init_current_prof .and. .not. current_prof_initialized) then
