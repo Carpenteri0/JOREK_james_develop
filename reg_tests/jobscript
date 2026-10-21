@@ -1,0 +1,34 @@
+#!/bin/bash
+
+### Hamilton queues : shared (119)/ multi (119)/ long (1)/ bigmem (2)/ test (1)
+### Shared / multi / long - share a single pool of 119 nodes - 128 CPU cores each - 400GB tmp space - 250GB RAM
+
+
+#SBATCH -J REGTESTS
+
+### Request resources:
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=8       #Number of MPI tasks per node
+#SBATCH --cpus-per-task=16        #Number of CPUs per task = Number of OMP threads
+#SBATCH --mem=100G                #memory required per cpu, in units M, G or T
+#SBATCH --gres=tmp:100G           #temporary disk space on each compute node ($TMPDIR)
+#SBATCH -t 3:0:0                  #time limit for job (format: days-hours:minutes:seconds) 
+
+ 
+### Smaller jobs can run in the shared queue. 
+### Larger jobs that will occupy one or more whole nodes should use the multi queue.
+
+#SBATCH -p shared
+ 
+### Commands to be run. 
+
+module load intel intelmpi mkl fftw hdf5 matlab
+export SZIP_LIB=/home/zhpw96/libs/szip-2.1.1/szip/lib
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
+### if more stack memory is needed
+### export OMP_STACKSIZE="400M"
+### ulimit -s unlimited
+
+mpirun -n 1 ./run_all.sh |& tee log
+

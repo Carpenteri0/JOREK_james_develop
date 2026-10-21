@@ -813,13 +813,11 @@ module phys_module
   !> @name integrated ffprime profile
   !> Note integration is performed in psi_n, not psi. Also square root is not attempted in integration routine
   !> so this profile is not F(psi_n), it is actually (psi_bnd-psi_ax)^(-1) * (F^2(psi_n) - F0^2)   (F0 - F on boundary/ in vaccuum)
-  integer, parameter :: intg_ffprime_max_len = 300            !< INTERNAL Max size of integrated ffprime profile (and therefore F-profile)
-  integer            :: intg_ffprime_len                      !< INTERNAL size of integrated ffprime profile
-  real*8             :: intg_ffprime_x (intg_ffprime_max_len) !< INTERNAL integrated ffprime profile
-  real*8             :: intg_ffprime_y0(intg_ffprime_max_len) !< INTERNAL integrated ffprime profile 
-  real*8             :: intg_ffprime_y1(intg_ffprime_max_len) !< INTERNAL integrated ffprime profile (1st deriv)
-  real*8             :: intg_ffprime_y2(intg_ffprime_max_len) !< INTERNAL integrated ffprime profile (2nd deriv)
-  real*8             :: intg_ffprime_y3(intg_ffprime_max_len) !< INTERNAL integrated ffprime profile (3rd deriv)
+  !> profile also has same length and x-axis as numeric ffprime profile
+  real*8, allocatable :: intg_ffprime_y0(:) !< INTERNAL integrated ffprime profile 
+  real*8, allocatable :: intg_ffprime_y1(:) !< INTERNAL integrated ffprime profile (1st deriv)
+  real*8, allocatable :: intg_ffprime_y2(:) !< INTERNAL integrated ffprime profile (2nd deriv)
+  real*8, allocatable :: intg_ffprime_y3(:) !< INTERNAL integrated ffprime profile (3rd deriv)
 
 
   !> --- Numerical input profiles for neoclassical coefficients
