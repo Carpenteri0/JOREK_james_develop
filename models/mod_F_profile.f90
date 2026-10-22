@@ -155,13 +155,17 @@ subroutine F_profile(xpoint2,xcase2,Z,Z_xpoint,psi,psi_axis,psi_bnd,&
         left = mid
       end if
     end do
-    aux1 = (psi_n - num_ffprime_x(left)) / (num_ffprime_x(right) - num_ffprime_x(left))
+    aux1 = (min(max(psi_n,0.d0),1.d0) - num_ffprime_x(left)) / (num_ffprime_x(right) - num_ffprime_x(left))
     aux2 = (1. - aux1)
     Fmid   = intg_ffprime_y0(left) * aux2 + intg_ffprime_y0(right) * aux1
     dFmid  = intg_ffprime_y1(left) * aux2 + intg_ffprime_y1(right) * aux1
     d2Fmid = intg_ffprime_y2(left) * aux2 + intg_ffprime_y2(right) * aux1
     d3Fmid = intg_ffprime_y3(left) * aux2 + intg_ffprime_y3(right) * aux1
-    
+    ! --- Outside seperatrix (psi_n>1): F=F0, FF'=0
+    if (psi_n .gt. 1.d0) then
+      dFmid = 0.d0; d2Fmid = 0.d0; d3Fmid = 0.d0
+    endif
+
     ! --- When using numerical F-profile, no need to denormalise
     if (num_Fprofile) then
       prof0        = Fmid
@@ -312,7 +316,7 @@ subroutine F_profile(xpoint2,xcase2,Z,Z_xpoint,psi,psi_axis,psi_bnd,&
   end if
 
   ! --- Normally not needed since we don't allow FF_1 with model710
-  FFprime_prof = FFprime_prof + FF_1
+  if (force_analytical) FFprime_prof = FFprime_prof + FF_1
 
   return
 end subroutine F_profile
@@ -515,11 +519,13 @@ end subroutine F_profile
 !>      intg_ffprime = (psi_bnd - psi_ax)^(-1) * (F^2(psi_n) - F0^2)
 !> where F0 is F at psi_n=1 - vacuum field. We make no attempt to find
 !> F at this stage as we don't yet know psi_bnd or psi_ax
-subroutine integrate_ffprime()
+subroutine integrate_ffprime(write_prof)
 
   use phys_module, only: xpoint, F0, FF_0, FF_1, FF_coef
   use phys_module, only: num_ffprime, num_ffprime_len, num_ffprime_x, num_ffprime_y0
   use phys_module, only: intg_ffprime_y0
+
+  logical, intent(in) :: write_prof
 
   !> internal vars
   integer :: i
@@ -545,11 +551,13 @@ subroutine integrate_ffprime()
   enddo
 
   !> write integrated profile to an outfile for diagnostic
-  open(newunit=iu, file="intg_ffprime.dat", status="replace", action="write")
-  do i = 1, num_ffprime_len
-    write(iu, '(2ES16.7)') num_ffprime_x(i), intg_ffprime_y0(i)
-  enddo
-  close(iu)
+  if ( write_prof .eq. .true. ) then
+    open(newunit=iu, file="intg_ffprime.dat", status="replace", action="write")
+    do i = 1, num_ffprime_len
+      write(iu, '(2ES16.7)') num_ffprime_x(i), intg_ffprime_y0(i)
+    enddo
+    close(iu)
+  endif
 end subroutine integrate_ffprime
     
   
