@@ -44,7 +44,7 @@ subroutine test_intg_ffprime_cubic()
     call test_intg_ffprime(f_c, f_calc, .false.)
     call assert_equals(f_c, f_calc, len_f, tol, &
         "ERROR: ffprime integration failed on cubic profile")
-end subroutine test_intg_ffprime_cubic()
+end subroutine test_intg_ffprime_cubic
 
 subroutine test_intg_ffprime_guass()
     implicit none
@@ -52,7 +52,7 @@ subroutine test_intg_ffprime_guass()
     call test_intg_ffprime(f_g, f_calc, .false.)
     call assert_equals(f_g, f_calc, len_f, tol, &
         "ERROR: ffprime integration failed on guass profile")
-end subroutine test_intg_ffprime_guass()
+end subroutine test_intg_ffprime_guass
 
 subroutine test_intg_ffprime_exp()
     implicit none
@@ -60,7 +60,7 @@ subroutine test_intg_ffprime_exp()
     call test_intg_ffprime(f_e, f_calc, .false.)
     call assert_equals(f_e, f_calc, len_f, tol, &
         "ERROR: ffprime integration failed on exp profile")
-end subroutine test_intg_ffprime_exp()
+end subroutine test_intg_ffprime_exp
 
 subroutine test_intg_ffprime_sin()
     implicit none
@@ -68,7 +68,7 @@ subroutine test_intg_ffprime_sin()
     call test_intg_ffprime(f_s, f_calc, .false.)
     call assert_equals(f_s, f_calc, len_f, tol, &
         "ERROR: ffprime integration failed on sin profile")
-end subroutine test_intg_ffprime_sin()
+end subroutine test_intg_ffprime_sin
 
 subroutine setup()
     implicit none
@@ -120,75 +120,74 @@ end subroutine setup
 
 subroutine teardown()
     implicit none
-    x = 0.d0; f_c = 0.d0; f_g = 0.d0; f_s = 0.d0;
+    x = 0.d0; f_c = 0.d0; f_g = 0.d0; f_e = 0.d0; f_s = 0.d0
 end subroutine teardown
 
 subroutine test_intg_ffprime(f, f_calc, write_prof)
     !> Same vars as integrate_ffprime routine
-    use phys_module, only: xpoint, F0, FF_0, FF_1, FF_coef
+    use phys_module, only: xpoint, F0, FF_0, FF_1, FF_coef, num_Fprofile, freeboundary_equil
     use phys_module, only: num_ffprime, num_ffprime_len, num_ffprime_x, num_ffprime_y0
     use phys_module, only: intg_ffprime_y0, intg_ffprime_y1, intg_ffprime_y2, intg_ffprime_y3
 
     use mod_F_profile
-    use profile, only: derivProf
+    use profiles, only: derivProf
     implicit none
 
     real*8,  intent(in)  :: f(:)
     real*8,  intent(out) :: f_calc(:)
     logical, intent(in)  :: write_prof
 
-    real*8, allocatable :: psi_arr(:), f_prime(:), f_calc(:)
+    real*8, allocatable :: psi_arr(:), f_prime(:), f_in(:)
     real*8              :: dp, F_prof
-    integer             :: len_f, i, iu
+    integer             :: n, i, iu
 
     !> fluff vars, but needed for F_profile routine
     real*8 :: dF_dpsi, dF_dz, dF_dpsi2, dF_dx2, dF_dpsi_dz, FFprime_prof
     real*8 :: dFF_dpsi, dFF_dz, dFF_dpsi2, dFF_dz2, dFF_dpsi_dz
 
     !> get length of input f prof
-    len_f = size(f)
+    n = size(f)
 
     !> Set all phys_module vars
-    xpoint      = .false.; F0 = f(len_f); FF_0 = 0.d0; FF_1 = 0.d0; FF_coef = 0.d0
-    num_ffprime = .true. ; num_ffprime_len = len_f
+    xpoint      = .false.; F0 = f(n); FF_0 = 0.d0; FF_1 = 0.d0; FF_coef = 0.d0
+    num_ffprime = .true. ; num_ffprime_len = n
+    num_Fprofile = .false.; freeboundary_equil = .false.
 
     !> allocate arrs
-    allocate(psi_arr(len_f));         allocate(f_prime(len_f))
-    allocate(num_ffprime_x(len_f));   allocate(num_ffprime_y0(len_f))
-    allocate(intg_ffprime_y0(len_f)); allocate(intg_ffprime_y1(len_f))
-    allocate(intg_ffprime_y2(len_f)); allocate(intg_ffprime_y3(len_f))
-    psi_arr         = 0.d0; f_prime         = 0.d0
+    allocate(psi_arr(n));         allocate(f_prime(n));         allocate(f_in(n))
+    allocate(num_ffprime_x(n));   allocate(num_ffprime_y0(n))
+    allocate(intg_ffprime_y0(n))
+    psi_arr         = 0.d0; f_prime         = 0.d0; f_in = f
     num_ffprime_x   = 0.d0; num_ffprime_y0  = 0.d0
-    intg_ffprime_y0 = 0.d0; intg_ffprime_y1 = 0.d0
-    intg_ffprime_y2 = 0.d0; intg_ffprime_y3 = 0.d0
+    intg_ffprime_y0 = 0.d0
     f_calc          = 0.d0
 
-    !> dpsi / dpsi_n = dp
-    dp = psi_ax - psi_bnd
+    !> dpsi / dpsi_n = dp (same convention as F_profile: psi_bnd - psi_ax)
+    dp = psi_bnd - psi_ax
 
     !> set up psi and psi_n arrays
-    do i = 1, len_f
-        num_ffprime_x(i) = real(i-1)/real(len_f - 1)
+    do i = 1, n
+        num_ffprime_x(i) = real(i-1)/real(n - 1)
         psi_arr(i)       = dp*num_ffprime_x(i) + psi_ax
     enddo
 
     !> take deriv of F and find FF'
-    call derivProf(psi_arr, f, len_f, f_prime)
-    do i = 1, len_f
+    call derivProf(psi_arr, f_in, n, f_prime)
+    do i = 1, n
         num_ffprime_y0(i) = f(i)*f_prime(i)
     enddo
 
     !> integrate ffprime prof in psi_n
-    call integrate_ffprime(write_prof=.false.)
+    call integrate_ffprime(write_prof)
 
     !> calc derivs of integrated ffprime prof
-    call derivProf(num_ffprime_x, intg_ffprime_y0, len_f, intg_ffprime_y1)
-    call derivProf(num_ffprime_x, intg_ffprime_y1, len_f, intg_ffprime_y2)
-    call derivProf(num_ffprime_x, intg_ffprime_y2, len_f, intg_ffprime_y3)
+    call derivProf(num_ffprime_x, intg_ffprime_y0, n, intg_ffprime_y1)
+    call derivProf(num_ffprime_x, intg_ffprime_y1, n, intg_ffprime_y2)
+    call derivProf(num_ffprime_x, intg_ffprime_y2, n, intg_ffprime_y3)
 
     !> Find F at all values of psi
-    do i = 1, len_f
-        call F_profile(.false., 1, 0, [0,0], psi_arr(i), psi_ax, psi_bnd,    &
+    do i = 1, n
+        call F_profile(.false., 1, 0.d0, [0.d0,0.d0], psi_arr(i), psi_ax, psi_bnd,    &
                        F_prof, dF_dpsi, dF_dz, dF_dpsi2, dF_dx2, dF_dpsi_dz, &
                        FFprime_prof, dFF_dpsi, dFF_dz, dFF_dpsi2, dFF_dz2, dFF_dpsi_dz)
         f_calc(i) = F_prof
@@ -198,14 +197,14 @@ subroutine test_intg_ffprime(f, f_calc, write_prof)
     if (write_prof) then
         open(newunit=iu, file="test_intg_ffprime.dat", status="replace", action="write")
         write(iu, "(A)") "# psi  f  ffp  f_calc "
-        do i = 1, len_f
+        do i = 1, n
             write(iu, "(4ES16.7)") psi_arr(i), f(i), num_ffprime_y0(i), f_calc(i)
         enddo
         close(iu)
     endif
 
     !> deallocate arrs
-    deallocate(f_calc)
+    deallocate(f_in)
     deallocate(psi_arr)
     deallocate(f_prime)
     deallocate(num_ffprime_x)
