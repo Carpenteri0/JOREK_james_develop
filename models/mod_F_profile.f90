@@ -193,7 +193,6 @@ subroutine F_profile(xpoint2,xcase2,Z,Z_xpoint,psi,psi_axis,psi_bnd,&
         dprof0_dpsi3 = - dprof0_dpsi3
       endif
 
-
       ! if (F0 .lt. 0.d0) Fmid   = - Fmid  
       ! if (F0 .lt. 0.d0) dFmid  = - dFmid 
       ! if (F0 .lt. 0.d0) d2Fmid = - d2Fmid
@@ -248,8 +247,6 @@ subroutine F_profile(xpoint2,xcase2,Z,Z_xpoint,psi,psi_axis,psi_bnd,&
     dFF_dpsi     = dFF_dpsi     * atn + FFprime_prof * datn
     dFF_dpsi2    = dFF_dpsi2    * atn + FFprime_prof * d2atn + 2.0 * dFF_dpsi * datn
   endif
-
-
 
   ! --- Cut-off at X-points
   if ( xpoint2 ) then

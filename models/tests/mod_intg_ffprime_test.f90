@@ -11,7 +11,7 @@ module mod_intg_ffprime_test
     use phys_module, only: xpoint, F0, FF_0, FF_1, FF_coef, num_Fprofile, freeboundary_equil
     use phys_module, only: num_ffprime, num_ffprime_len, num_ffprime_x, num_ffprime_y0
     use phys_module, only: intg_ffprime_y0, intg_ffprime_y1, intg_ffprime_y2, intg_ffprime_y3
-    use constants,   only: TWOPI
+    use constants,   only: PI
     implicit none
 
     private
@@ -19,10 +19,10 @@ module mod_intg_ffprime_test
 
     !> Vars to change for testing -----------------------------
     integer, parameter :: len_f   = 500
-    real*8,  parameter :: f_0     = -0.8d0
-    real*8,  parameter :: psi_ax  = 0.03d0
-    real*8,  parameter :: psi_bnd = -1.42d0
     real*8,  parameter :: tol     = 0.001d0
+
+    !> random to be defined in setup as well as prof shapes
+    real*8  :: f_0, psi_ax, psi_bnd
 
     !> internal vars
     real*8  :: x(len_f), f_c(len_f), f_g(len_f), f_e(len_f), f_s(len_f)
@@ -82,7 +82,7 @@ end subroutine test_intg_ffprime_sin
 subroutine setup()
     implicit none
 
-    real*8  :: ran(11)
+    real*8  :: ran(14)
     real*8  :: c(3), g(3), e(2), s(3)
     real*8  :: fc0, fg0, fe0, fs0
     integer :: i
@@ -105,8 +105,14 @@ subroutine setup()
     e(2) = 1.d0 + 19.d0*ran(8)
 
     !> sinusoidal coeffs
-    s(1:2) = 20*ran(9:10)
-    s(3)   = TWOPI*ran(11)
+    s(1) = 20*ran(9)
+    s(2) = 0.95*PI*ran(10)
+    s(3) = 2.d0*PI*ran(11)
+
+    !> psi / f0
+    f_0     = 20*ran(12) - 10
+    psi_ax  = 20*ran(13) - 10
+    psi_bnd = 20*ran(14) - 10
 
     !> generate functions
     do i = 1, len_f
@@ -120,11 +126,11 @@ subroutine setup()
     !> find values on bnd
     fc0 = f_c(len_f); fg0 = f_g(len_f); fe0 = f_e(len_f); fs0 = f_s(len_f)
 
-    !> scale profiles to be F0 on boundary
-    f_c = f_c - fc0 + f_0
-    f_g = f_g - fg0 + f_0
-    f_e = f_e - fe0 + f_0
-    f_s = f_s - fs0 + f_0
+    !> scale profiles to be F0 on boundary and totally positive or negative (F cant cross 0)
+    f_c = sign(1.d0, f_0)*abs(f_c - fc0) + f_0
+    f_g = sign(1.d0, f_0)*abs(f_g - fg0) + f_0
+    f_e = sign(1.d0, f_0)*abs(f_e - fe0) + f_0
+    f_s = sign(1.d0, f_0)*abs(f_s - fs0) + f_0
 end subroutine setup
 
 subroutine teardown()

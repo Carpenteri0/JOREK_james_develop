@@ -130,7 +130,7 @@ subroutine read_num_profiles(my_id)
       ! call check_F_profile_accuracy() ! this will abort if error is too large
 
       !> integrate ffprime profile
-      call integrate_ffprime()  !> This should set intg_ffprime_x and _y0
+      call integrate_ffprime(write_prof=.true.)  !> This should set intg_ffprime_x and _y0
       call derivProf(num_ffprime_x, intg_ffprime_y0, num_ffprime_len, intg_ffprime_y1)
       call derivProf(num_ffprime_x, intg_ffprime_y1, num_ffprime_len, intg_ffprime_y2)
       call derivProf(num_ffprime_x, intg_ffprime_y2, num_ffprime_len, intg_ffprime_y3)
