@@ -233,7 +233,7 @@ subroutine write_profile(fname, psi, f, ffp, f_calc)
   open(newunit=iu, file=fname, status="replace", action="write")
   write(iu,"(A)") "#  psi  f  ffp  f_calc  err"
   do i = 1, size(f)
-    write(iu,"(5ES16.7)") psi(i), f(i), ffp(i), f_calc(i), f_calc(i) - f(i)
+    write(iu,"(5ES16.7)") psi(i), f(i), ffp(i), f_calc(i), abs(f_calc(i) - f(i))
   enddo
   close(iu)
 end subroutine

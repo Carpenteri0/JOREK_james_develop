@@ -181,7 +181,7 @@ subroutine F_profile(xpoint2,xcase2,Z,Z_xpoint,psi,psi_axis,psi_bnd,&
     !             d2Fmid = 2dp   * ((F')^2 + FF'' )
     !             d3Fmid = 2dp^2 * (3F'F'' + FF''')
     else
-      prof0        = (abs(delta_psi*Fmid + F0**2))**(0.5d0)
+      prof0        = (delta_psi*Fmid + F0**2)**(0.5d0)
       dprof0_dpsi  =  dFmid / (2*prof0)
       dprof0_dpsi2 = (d2Fmid/(2*delta_psi   ) - (dprof0_dpsi)**2          ) / prof0
       dprof0_dpsi3 = (d3Fmid/(2*delta_psi**2) - 3*dprof0_dpsi*dprof0_dpsi2) / prof0
@@ -547,7 +547,7 @@ subroutine integrate_ffprime(write_prof)
     integrand = num_ffprime_y0(i+1) + num_ffprime_y0(i)
     dpsi_n    = num_ffprime_x(i+1)  - num_ffprime_x(i)
 
-    intg_ffprime_y0(i) = intg_ffprime_y0(i+1) + integrand*dpsi_n
+    intg_ffprime_y0(i) = intg_ffprime_y0(i+1) - integrand*dpsi_n
   enddo
 
   !> write integrated profile to an outfile for diagnostic
