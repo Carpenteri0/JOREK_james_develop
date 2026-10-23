@@ -601,21 +601,23 @@ write(*,*) "n elements:", element_list%n_elements
   !***********************************************************************
 
   !> DEBUG FFprime
-  if (my_id == 0) write(*,*) "DEBUG : writing F_profile.dat"
-  do idebug = 1, n_fprof
-    psi_n_debug(idebug) = dble(idebug - 1)/dble(n_fprof - 1)
-    psi = psi_n_debug(idebug)*(ES%psi_bnd - ES%psi_axis) + ES%psi_axis
-    call F_profile(.false., 1, 0.d0, [0.d0, 0.d0], psi, ES%psi_axis, ES%psi_bnd, &
-                   F_prof, dF_dpsi, dF_dz, dF_dpsi2, dF_dz2, dF_dpsi_dz, &
-                   FFprime_prof, dFF_dpsi, dFF_dz, dFF_dpsi2, dFF_dz2, dFF_dpsi_dz)
-    f_debug(idebug) = F_prof
-  enddo
-
-  open(newunit=iu, file="F_profile.dat", status="replace", action="write")
-  do idebug = 1, n_fprof
-    write(iu, '(2ES16.7)') psi_n_debug(idebug), f_debug(idebug)
-  enddo
-  close(iu)
+  if (my_id == 0) then 
+    write(*,*) "DEBUG : writing F_profile.dat"
+    do idebug = 1, n_fprof
+      psi_n_debug(idebug) = dble(idebug - 1)/dble(n_fprof - 1)
+      psi = psi_n_debug(idebug)*(ES%psi_bnd - ES%psi_axis) + ES%psi_axis
+      call F_profile(.false., 1, 0.d0, [0.d0, 0.d0], psi, ES%psi_axis, ES%psi_bnd, &
+                    F_prof, dF_dpsi, dF_dz, dF_dpsi2, dF_dz2, dF_dpsi_dz, &
+                    FFprime_prof, dFF_dpsi, dFF_dz, dFF_dpsi2, dFF_dz2, dFF_dpsi_dz)
+      f_debug(idebug) = F_prof
+    enddo
+    
+    open(newunit=iu, file="F_profile.dat", status="replace", action="write")
+    do idebug = 1, n_fprof
+      write(iu, '(2ES16.7)') psi_n_debug(idebug), f_debug(idebug)
+    enddo
+    close(iu)
+  endif
   
   t_now     = t_start      ! t_now: current time in the simulation
   

@@ -204,9 +204,10 @@ subroutine test_intg_ffprime(f, f_calc, psi_arr)
     psi_loc = psi_arr; f_loc = f
 
     !> take deriv of F and find FF'
+    !> JOREK convention to negate FF'
     call derivProf(psi_loc, f_loc, n, f_prime)
     do i = 1, n
-        num_ffprime_y0(i) = f(i)*f_prime(i)
+        num_ffprime_y0(i) = -f(i)*f_prime(i)
     enddo
 
     ! write(*,*) "DEBUG : num_ffprime_x  : ", num_ffprime_x

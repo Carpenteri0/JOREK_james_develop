@@ -539,9 +539,9 @@ subroutine integrate_ffprime(write_prof)
   !> Loop over psi_n backwards
   do i = num_ffprime_len - 1, 1, -1
 
-    !> integrate using trapezium rule.
+    !> integrate using trapezium rule. (note neg integrand by JOREK's negating ffprime negation)
     !> ignore factor of 1/2 as it shows up in FF' = 1/2 d/dpsi(F^2)
-    integrand = num_ffprime_y0(i+1) + num_ffprime_y0(i)
+    integrand = -(num_ffprime_y0(i+1) + num_ffprime_y0(i))
     dpsi_n    = num_ffprime_x(i+1)  - num_ffprime_x(i)
 
     intg_ffprime_y0(i) = intg_ffprime_y0(i+1) - integrand*dpsi_n
