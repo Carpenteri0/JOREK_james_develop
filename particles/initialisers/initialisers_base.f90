@@ -1830,29 +1830,16 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
   real*8,  allocatable         :: stored_x(:,:), stored_v(:,:), stored_st(:,:)  !> for storing particle quantites
   integer, allocatable         :: stored_ielm(:)
 
-  !> debug vars
-  real*8 :: Fprof
-  real*8 :: P(3), P_s(3), P_t(3), P_phi(3)
-  real*8 :: R_i, R_s, R_t, Z_i, Z_s, Z_t
-  real*8 :: inv_st_jac
-  real*8 :: A3_R, A3_Z, AR_Z, AR_p, AZ_R, AZ_p
-
   !> header print
-  if (sim%my_id .eq. 0) then 
-    write(*,*) "=== Initialising particles with a slowing-down distribution ==="
-    write(*,*) 'time, time_now, time_prev, static :', sim%time, sim%fields%static  ! plus time_now/time_prev from the linear fields object
-  endif
+  if (sim%my_id .eq. 0) write(*,*) "=== Initialising particles with a slowing-down distribution ==="
 
-
-  !> is there a spatial pdf?
+  !> is there a spatial pdf? if no then uniform in space
   use_rej = associated(space_pdf%f)
 
   !> init slowing down dist values
   v_c      = 0.58d0*v_max
   v_peak   = 2**(1.d0/3.d0)*v_c  
   pdf_peak = v_peak**2 / (v_peak**3 + v_c**3)
-  if (sim%my_id .eq. 0) write(*,*) "DEBUG : pdf_peak = ", pdf_peak
-
 
   !> init arrays
   n_particles = size(sim%groups(group_num)%particles(:))
@@ -1869,8 +1856,7 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
   !> init rngs
   call setup_shared_rngs(7, random_seed(), pcg32_rng(), rng)
 
-  !> omp loop over all particles
-
+  !> OpenMP loop over all markers
   !$omp parallel do default(none) &
   !$omp shared( sim, rng, n_particles, v_max, v_c, PitchBox,   &
   !$omp         vBox, Rbox, Zbox, pdf_peak, use_rej, space_pdf, &
@@ -1878,22 +1864,18 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
   !$omp private(i_part, accepted, tid, ran, R, Z, dummy_R, dummy_Z, &
   !$omp         phi, v, v_mag, pitch, gyro_angle, s, t, heaviside,  &
   !$omp         f_v, f_x, E, B, psi, U, B_norm, e1, e2, v_par,      &
-  !$omp         v_perp, i_elm, ifail,                               &
-  !$omp         Fprof, P, P_s, P_t, P_phi, R_i, R_s, R_t, Z_i, Z_s, Z_t, inv_st_jac, A3_R, A3_Z, AR_Z, AR_p, AZ_R, AZ_p)
+  !$omp         v_perp, i_elm, ifail)
 
   do i_part = 1, n_particles
 
     tid = 1
     !$ tid = omp_get_thread_num() + 1
 
-    ! MISSING : find st at particle loc
-    !           get magnetic field at particle loc
-    !           distribute velocity coords
-
+    !> loop until uniformlly sampled coordinates meet rejection criteria
     accepted = .false.
     do while (.not. accepted)
 
-    ! ---- 1. draw uniform random number and convert to coordinates
+    ! ---- 1. draw uniform random number and convert to real/phase-space coordinates
       call rng(tid)%next(ran)
       call transform_uniform_cylindrical(ran(1:3), Rbox, Zbox, [0.d0, TWOPI], R, Z, phi)
       v_mag      = ran(4) * (vBox(2)     - vBox(1)) + vBox(1) 
@@ -1914,19 +1896,6 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
 
       !> reject if ran(7) > p(v)/pdf_peak
       if (ran(7) .ge. f_v) cycle
-      call sim%fields%calc_F_profile(i_elm, s, t, phi, Fprof) ; write(*,*) Fprof
-      call interp_PRZ(sim%fields%node_list, sim%fields%element_list, i_elm, [1,2,3], 3, &
-                      s, t, phi, P, P_s, P_t, P_phi, R, R_s, R_t, Z, Z_s, Z_t)        ! direct, no time interpolation
-
-      if (i_part .le. 10) then
-        if (sim%my_id .eq. 0) then
-          write(*,*) "DEBUG : i_part = ", i_part, "v = ", v_mag, "f_v = ", f_v, "ran(7) = ", ran(7)
-
-            write(*,*) 'Fprof (at the bad marker) :', Fprof
-            write(*,*) 'direct P, P_s:', P, P_s
-
-        endif
-      endif
 
     ! --- 4. Evaluate real-space distribution for this position
       if (use_rej) then
@@ -1938,14 +1907,7 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
       endif
 
     ! --- 5. Calc velocity components (at this point we have accepted the particle)
-
       call sim%fields%calc_EBpsiU(sim%time, i_elm, [s, t], phi, E, B, psi, U)
-      ! if (any(B /= B) .or. norm2(B) == 0.d0) then
-      !   write(*,'(A,I8,7ES12.4)') 'bad B: ielm,R,Z,s,t,phi,psi,|B| =', i_elm, R, Z, s, t, phi, psi, norm2(B)
-      !   cycle   ! resample rather than propagate NaN
-      ! endif
-
-
       B_norm = B / sqrt(dot_product(B, B))
       v_par  = pitch*v_mag
       v_perp = v_mag*max(0.d0, sqrt(1 - pitch**2))
@@ -1953,20 +1915,13 @@ subroutine initialise_particles_slowing_down(sim, group_num, space_pdf, v_max)
       call get_orthonormals(B_norm, e1, e2)
       v = v_par*B_norm + v_perp*(cos(gyro_angle)*e1 + sin(gyro_angle)*e2)
 
-      if (i_part .le. 10) then
-        if (sim%my_id .eq. 0) then
-          write(*,*) "DEBUG : B = ", B, "B_norm = ", B_norm, "v_par = ", v_par, "v_perp = ", v_perp, "v = ", v
-        endif
-      endif
-
-
       accepted = .true.
-    enddo !> rejection loop
+    enddo !> rejection sampling loop
 
-    ! --- 4. store accepted particles
+    ! --- 4. store accepted coordinates
     stored_x(:,  i_part)  = [R, Z, phi]
     stored_v(:,  i_part)  = v
-    stored_st(:, i_part) = [s, t]
+    stored_st(:, i_part)  = [s, t]
     stored_ielm( i_part)  = i_elm
 
   enddo !> particle loop
