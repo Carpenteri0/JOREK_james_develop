@@ -92,6 +92,8 @@ program JOREK2
                                             stdout=>output_unit, &
                                             stderr=>error_unit
   use mod_newton_solver, only: solve_newton
+
+  use mod_F_profile
   
   implicit none
 
@@ -181,7 +183,16 @@ program JOREK2
   type(type_SP_MATRIX)        :: a_mat
   type(type_RHS)              :: rhs_vec, deltas
   type(type_SP_SOLVER)        :: solver
- 
+
+
+  !> F_profile debug
+  integer, parameter :: n_fprof = 500
+  integer            :: idebug, iu
+  real*8             :: psi_n_debug(n_fprof), f_debug(n_fprof)
+  real*8             :: psi_debug, F_prof, dF_dpsi, dF_dz, dF_dpsi2
+  real*8             :: dF_dz2, dF_dpsi_dz, FFprime_prof, dFF_dpsi
+  real*8             :: dFF_dz, dFF_dpsi2, dFF_dz2, dFF_dpsi_dz
+
   call init_expr()
   allocate(res(exprs_all_int%n_expr+1))
   res = 0.d0   
@@ -588,6 +599,25 @@ write(*,*) "n elements:", element_list%n_elements
   !***********************************************************************
   !*                 end of initilisation/equilibrium                    *
   !***********************************************************************
+
+  !> DEBUG FFprime
+  if (my_id == 0) then 
+    write(*,*) "DEBUG : writing F_profile.dat"
+    do idebug = 1, n_fprof
+      psi_n_debug(idebug) = dble(idebug - 1)/dble(n_fprof - 1)
+      psi = psi_n_debug(idebug)*(ES%psi_bnd - ES%psi_axis) + ES%psi_axis
+      call F_profile(.false., 1, 0.d0, [0.d0, 0.d0], psi, ES%psi_axis, ES%psi_bnd, &
+                    F_prof, dF_dpsi, dF_dz, dF_dpsi2, dF_dz2, dF_dpsi_dz, &
+                    FFprime_prof, dFF_dpsi, dFF_dz, dFF_dpsi2, dFF_dz2, dFF_dpsi_dz)
+      f_debug(idebug) = F_prof
+    enddo
+    
+    open(newunit=iu, file="F_profile.dat", status="replace", action="write")
+    do idebug = 1, n_fprof
+      write(iu, '(2ES16.7)') psi_n_debug(idebug), f_debug(idebug)
+    enddo
+    close(iu)
+  endif
   
   t_now     = t_start      ! t_now: current time in the simulation
   

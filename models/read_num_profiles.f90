@@ -73,12 +73,27 @@ subroutine read_num_profiles(my_id)
       check_positive=.false.)
     FF_0 = num_ffprime_y0(1)
     FF_1 = num_ffprime_y0(num_ffprime_len)
-    num_ffprime_y0 = num_ffprime_y0 - FF_1
+#ifndef fullmhd
+      ! --- In fMHD F is obtained via integrating full FF', no subtraction needed
+      write(*,*) "DEBUG : in ifndef fullmhd block"
+      num_ffprime_y0 = num_ffprime_y0 - FF_1
+#endif
     ! --- Early allocation needed for full-MHD
-    if ( allocated(num_ffprime_y1) ) deallocate( num_ffprime_y1 )
-    if ( allocated(num_ffprime_y2) ) deallocate( num_ffprime_y2 )
+    if ( allocated(num_ffprime_y1 )) deallocate( num_ffprime_y1 )
+    if ( allocated(num_ffprime_y2 )) deallocate( num_ffprime_y2 )
     call tr_allocate(num_ffprime_y1,1,num_ffprime_len,"num_ffprime_y1",CAT_GRID)
     call tr_allocate(num_ffprime_y2,1,num_ffprime_len,"num_ffprime_y2",CAT_GRID)
+#ifdef fullmhd
+      write(*,*) "DEBUG : in ifdef fullmhd block"
+      if ( allocated(intg_ffprime_y0) ) deallocate( intg_ffprime_y0)
+      if ( allocated(intg_ffprime_y1) ) deallocate( intg_ffprime_y1)
+      if ( allocated(intg_ffprime_y2) ) deallocate( intg_ffprime_y2)
+      if ( allocated(intg_ffprime_y3) ) deallocate( intg_ffprime_y3)
+      call tr_allocate(intg_ffprime_y0,1,num_ffprime_len,"intg_ffprime_y0",CAT_GRID)
+      call tr_allocate(intg_ffprime_y1,1,num_ffprime_len,"intg_ffprime_y1",CAT_GRID)
+      call tr_allocate(intg_ffprime_y2,1,num_ffprime_len,"intg_ffprime_y2",CAT_GRID)
+      call tr_allocate(intg_ffprime_y3,1,num_ffprime_len,"intg_ffprime_y3",CAT_GRID)
+#endif
   end if
   
   ! --- Special case for F-profile in model710:
@@ -98,29 +113,37 @@ subroutine read_num_profiles(my_id)
 #ifdef fullmhd
   if (my_id == 0) then
     if ( .not. num_Fprofile ) then
-      ! --- Numerical integration of FFprime
-      call integrate_F_profile()
-      ! --- Copy profile from internal profile instead of reading it from file
-      num_Fprofile_len = n_Fprofile_internal
-      if ( allocated(num_Fprofile_x ) ) deallocate( num_Fprofile_x  )
-      if ( allocated(num_Fprofile_y0) ) deallocate( num_Fprofile_y0 )
-      if ( allocated(num_Fprofile_y1) ) deallocate( num_Fprofile_y1 )
-      if ( allocated(num_Fprofile_y2) ) deallocate( num_Fprofile_y2 )
-      if ( allocated(num_Fprofile_y3) ) deallocate( num_Fprofile_y3 )
-      call tr_allocate(num_Fprofile_x ,1,n_Fprofile_internal,"num_Fprofile_x",CAT_GRID)
-      call tr_allocate(num_Fprofile_y0,1,n_Fprofile_internal,"num_Fprofile_y0",CAT_GRID)
-      call tr_allocate(num_Fprofile_y1,1,n_Fprofile_internal,"num_Fprofile_y1",CAT_GRID)
-      call tr_allocate(num_Fprofile_y2,1,n_Fprofile_internal,"num_Fprofile_y2",CAT_GRID)
-      call tr_allocate(num_Fprofile_y3,1,n_Fprofile_internal,"num_Fprofile_y3",CAT_GRID)
-      do i=1,n_Fprofile_internal
-        num_Fprofile_x (i) = Fprofile_psi_max * real(i-1)/real(n_Fprofile_internal-1)
-        num_Fprofile_y0(i) = Fprofile_internal(i)
-      enddo
-      call derivProf(num_Fprofile_x, num_Fprofile_y0, num_Fprofile_len, num_Fprofile_y1)
-      call derivProf(num_Fprofile_x, num_Fprofile_y1, num_Fprofile_len, num_Fprofile_y2)
-      call derivProf(num_Fprofile_x, num_Fprofile_y2, num_Fprofile_len, num_Fprofile_y3)
-      ! --- Check that new profile is accurate by deriving again and comparing against input FFprime
-      call check_F_profile_accuracy() ! this will abort if error is too large
+      ! ! --- Numerical integration of FFprime
+      ! call integrate_F_profile()
+      ! ! --- Copy profile from internal profile instead of reading it from file
+      ! num_Fprofile_len = n_Fprofile_internal
+      ! if ( allocated(num_Fprofile_x ) ) deallocate( num_Fprofile_x  )
+      ! if ( allocated(num_Fprofile_y0) ) deallocate( num_Fprofile_y0 )
+      ! if ( allocated(num_Fprofile_y1) ) deallocate( num_Fprofile_y1 )
+      ! if ( allocated(num_Fprofile_y2) ) deallocate( num_Fprofile_y2 )
+      ! if ( allocated(num_Fprofile_y3) ) deallocate( num_Fprofile_y3 )
+      ! call tr_allocate(num_Fprofile_x ,1,n_Fprofile_internal,"num_Fprofile_x",CAT_GRID)
+      ! call tr_allocate(num_Fprofile_y0,1,n_Fprofile_internal,"num_Fprofile_y0",CAT_GRID)
+      ! call tr_allocate(num_Fprofile_y1,1,n_Fprofile_internal,"num_Fprofile_y1",CAT_GRID)
+      ! call tr_allocate(num_Fprofile_y2,1,n_Fprofile_internal,"num_Fprofile_y2",CAT_GRID)
+      ! call tr_allocate(num_Fprofile_y3,1,n_Fprofile_internal,"num_Fprofile_y3",CAT_GRID)
+      ! do i=1,n_Fprofile_internal
+      !   num_Fprofile_x (i) = Fprofile_psi_max * real(i-1)/real(n_Fprofile_internal-1)
+      !   num_Fprofile_y0(i) = Fprofile_internal(i)
+      ! enddo
+      ! call derivProf(num_Fprofile_x, num_Fprofile_y0, num_Fprofile_len, num_Fprofile_y1)
+      ! call derivProf(num_Fprofile_x, num_Fprofile_y1, num_Fprofile_len, num_Fprofile_y2)
+      ! call derivProf(num_Fprofile_x, num_Fprofile_y2, num_Fprofile_len, num_Fprofile_y3)
+      ! ! --- Check that new profile is accurate by deriving again and comparing against input FFprime
+      ! call check_F_profile_accuracy() ! this will abort if error is too large
+
+      !> integrate ffprime profile
+      call integrate_ffprime(write_prof=.true.)  !> This should set intg_ffprime_x and _y0
+      call derivProf(num_ffprime_x, intg_ffprime_y0, num_ffprime_len, intg_ffprime_y1)
+      call derivProf(num_ffprime_x, intg_ffprime_y1, num_ffprime_len, intg_ffprime_y2)
+      call derivProf(num_ffprime_x, intg_ffprime_y2, num_ffprime_len, intg_ffprime_y3)
+
+      !> SHOULD CHECK INTEGRATION HERE
     else
       call readProf(num_Fprofile_x, num_Fprofile_y0, num_Fprofile_len, Fprofile_file)
       call check_num_prof(num_Fprofile, num_Fprofile_x, num_Fprofile_y0, num_Fprofile_len, 'Fprofile',    &

@@ -95,6 +95,7 @@ DIRS := diagnostics				\
 	benchmarks				\
 	core					\
 	core/tests                      	\
+	models/tests				\
 	.					\
 	vacuum
 
