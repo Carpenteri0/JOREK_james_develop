@@ -67,16 +67,18 @@ subroutine read_num_profiles(my_id)
       check_positive=.false.)
     FF_0 = num_ffprime_y0(1)
     FF_1 = num_ffprime_y0(num_ffprime_len)
-    #ifndef fullmhd
+#ifndef fullmhd
       ! --- In fMHD F is obtained via integrating full FF', no subtraction needed
+      write(*,*) "DEBUG : in ifndef fullmhd block"
       num_ffprime_y0 = num_ffprime_y0 - FF_1
-    #endif
+#endif
     ! --- Early allocation needed for full-MHD
     if ( allocated(num_ffprime_y1 )) deallocate( num_ffprime_y1 )
     if ( allocated(num_ffprime_y2 )) deallocate( num_ffprime_y2 )
     call tr_allocate(num_ffprime_y1,1,num_ffprime_len,"num_ffprime_y1",CAT_GRID)
     call tr_allocate(num_ffprime_y2,1,num_ffprime_len,"num_ffprime_y2",CAT_GRID)
-    #ifdef fullmhd
+#ifdef fullmhd
+      write(*,*) "DEBUG : in ifdef fullmhd block"
       if ( allocated(intg_ffprime_y0) ) deallocate( intg_ffprime_y0)
       if ( allocated(intg_ffprime_y1) ) deallocate( intg_ffprime_y1)
       if ( allocated(intg_ffprime_y2) ) deallocate( intg_ffprime_y2)
@@ -85,7 +87,7 @@ subroutine read_num_profiles(my_id)
       call tr_allocate(intg_ffprime_y1,1,num_ffprime_len,"intg_ffprime_y1",CAT_GRID)
       call tr_allocate(intg_ffprime_y2,1,num_ffprime_len,"intg_ffprime_y2",CAT_GRID)
       call tr_allocate(intg_ffprime_y3,1,num_ffprime_len,"intg_ffprime_y3",CAT_GRID)
-    #endif
+#endif
   end if
   
   ! --- Special case for F-profile in model710:

@@ -158,7 +158,7 @@ if ( num_ffprime ) then
     call tr_allocate(num_ffprime_y0,1,num_ffprime_len,"num_ffprime_y0",CAT_UNKNOWN)
     call tr_allocate(num_ffprime_y1,1,num_ffprime_len,"num_ffprime_y1",CAT_UNKNOWN)
     call tr_allocate(num_ffprime_y2,1,num_ffprime_len,"num_ffprime_y2",CAT_UNKNOWN)
-    #ifdef fullmhd
+#ifdef fullmhd
      if (allocated(intg_ffprime_y0)) deallocate(intg_ffprime_y0)
      if (allocated(intg_ffprime_y1)) deallocate(intg_ffprime_y1)
      if (allocated(intg_ffprime_y2)) deallocate(intg_ffprime_y2)
@@ -167,18 +167,18 @@ if ( num_ffprime ) then
      call tr_allocate(intg_ffprime_y1,1,num_ffprime_len,"intg_ffprime_y1",CAT_UNKNOWN)
      call tr_allocate(intg_ffprime_y2,1,num_ffprime_len,"intg_ffprime_y2",CAT_UNKNOWN)
      call tr_allocate(intg_ffprime_y3,1,num_ffprime_len,"intg_ffprime_y3",CAT_UNKNOWN)
-    #endif
+#endif
   end if
   call MPI_BCAST(num_ffprime_x,num_ffprime_len,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierr)
   call MPI_BCAST(num_ffprime_y0,num_ffprime_len,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierr)
   call MPI_BCAST(num_ffprime_y1,num_ffprime_len,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierr)
   call MPI_BCAST(num_ffprime_y2,num_ffprime_len,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierr)
-  #ifdef fullmhd
+#ifdef fullmhd
     call MPI_BCAST(intg_ffprime_y0,num_ffprime_len,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierr)
     call MPI_BCAST(intg_ffprime_y1,num_ffprime_len,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierr)
     call MPI_BCAST(intg_ffprime_y2,num_ffprime_len,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierr)
     call MPI_BCAST(intg_ffprime_y3,num_ffprime_len,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierr)
-  #endif
+#endif
 end if
 
 if ( num_d_perp ) then

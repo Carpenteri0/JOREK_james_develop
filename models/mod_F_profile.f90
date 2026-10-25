@@ -524,12 +524,16 @@ subroutine integrate_ffprime(write_prof)
 
   logical, intent(in) :: write_prof
 
+  
   !> internal vars
   integer :: i
   real*8  :: integrand, dpsi_n
-
+  
   !> DEBUG VARS
   integer :: iu
+
+  
+  write(*,*) "DEBUG ffp(0,1) = ", num_ffprime_y0(1), num_ffprime_y0(num_ffprime_len)
 
   !> init integral
   intg_ffprime_y0(num_ffprime_len) = 0.d0
