@@ -22,7 +22,8 @@
 !>  Any other init_function produces an explicit error at initialisation time.
 module mod_initialise_particles
   use mod_rej_f
-  use initialisers_RE
+  use mod_particle_sim
+  use mod_particle_types
   use initialisers_base
   use mod_import_experimental_dist
   use phys_module, only: part_group_configs, type_part_group_config, n_part_groups
