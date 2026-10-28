@@ -1158,6 +1158,7 @@ write(*,'(1x,a)',advance='no') ' USE_DOMM            : '
       if (sim%groups(group_num)%coupling_scheme .eq. 'epf') then
         write(*,REAL_FMT) 'T_maxwell,              ',part_group_configs(group_num)%T_maxwell
         write(*,INTG_FMT) 'n_phi_planes,           ',part_group_configs(group_num)%n_phi_planes
+        write(*,REAL_FMT) 'v_max,                  ',part_group_configs(group_num)%v_max
         write(*,REAL_FMT) 'n_particles_total,      ',part_group_configs(group_num)%n_particles_total
         write(*,INTG_FMT) 'proj_collection_period, ',proj_collection_period
       endif

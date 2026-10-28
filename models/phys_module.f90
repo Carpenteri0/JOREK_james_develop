@@ -1124,6 +1124,7 @@ module phys_module
                                                    !< for example n_phi_planes=4, n_particles=1e4 then only 250 particles are initialised
                                                    !< each particle is then copied multiple (3) times around the torus with angle 2pi/n_phi_planes (= pi/2)
                                                    !< if n_phi_planes=int*n_period then projected particle quantities are initialised as 0 for n_tor>1
+    real*8              :: v_max                   !< Maximum velocity for slowing down distribution, only used for init_function = "slowing_down"
 
     ! =============== for rep and epf ===================
     real*8              :: n_particles_total       !< Total number of particles to simulate (ie sum(weights)) !!NOT n_particles - total number of super/numeric-particles

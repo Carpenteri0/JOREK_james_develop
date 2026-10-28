@@ -932,6 +932,8 @@ part_group_configs(:)%re_pitch               = 0.d0
 !----- specific to epf
 part_group_configs(:)%T_maxwell              = 0.d0
 part_group_configs(:)%n_phi_planes           = 0
+part_group_configs(:)%v_max                  = 0.d0
+
 
 !----- specific to rep and epf
 part_group_configs(:)%n_particles_total      = 0.d0

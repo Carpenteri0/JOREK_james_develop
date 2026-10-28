@@ -190,9 +190,7 @@ subroutine check_compatibility_epf(group_num)
       write(*,*) "  needs to be at least 1, please set part_group_configs()%n_phi_planes"
       call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
     endif
-  endif
-
-  if (trim(part_group_configs(group_num)%init_function) .eq. 'maxwell') then
+  elseif (trim(part_group_configs(group_num)%init_function) .eq. 'maxwell') then
     if (part_group_configs(group_num)%T_maxwell .eq. 0.d0) then
       write(*,*) "ERROR: Maxwell initialisation chosen, but no temperature supplied"
       write(*,*) "  please set part_group_configs()%T_maxwell"
@@ -201,6 +199,12 @@ subroutine check_compatibility_epf(group_num)
     if (part_group_configs(group_num)%n_phi_planes .eq. 0) then
       write(*,*) "ERROR: Maxwell initialisation chosen, but n_phi_planes = 0"
       write(*,*) "  needs to be at least 1, please set part_group_configs()%n_phi_planes"
+      call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
+    endif
+  elseif (trim(part_group_configs(group_num)%init_function) .eq. "slowing_down") then
+    if (part_group_configs(group_num)%v_max .eq. 0.d0) then
+      write(*,*) "ERROR : Slowing_down initialisation chosen, but no v_max supplied"
+      write(*,*) "  please set part_group_configs()%v_max"
       call MPI_ABORT(MPI_COMM_WORLD, 1, ierr)
     endif
   endif
