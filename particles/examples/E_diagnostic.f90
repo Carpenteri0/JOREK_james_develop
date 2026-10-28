@@ -12,7 +12,6 @@
 module write_E_time
   use mod_event, only: event, action
   use equil_info, only:find_xpoint
-  use mod_interp
   implicit none
 
   type, extends(action) :: save_E

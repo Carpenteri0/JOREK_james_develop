@@ -4,7 +4,6 @@ program test_generalised_initialisation_gc_H_mu_psi
 !> initialize_particles_H_mu_psi implemented in mod_initialise_particles
 use constants, only: TWOPI,PI,ATOMIC_MASS_UNIT,EL_CHG
 use particle_tracer
-use mod_interp
 implicit none
 type(pcg32_rng) :: rng_pcg32
 type(event)     :: field_reader,particle_writer
