@@ -159,8 +159,9 @@ module mod_initialise_particles
     !> EPs : slowing down distribution
     case ('slowing_down')
       if (sim%my_id == 0) write(*,*) "  Sampler: slowing_down"
+      write(*, '(A,ES12.3,A)') "  v_max : ", config%v_max, " [m/s]"
 
-      call initialise_particles_slowing_down(sim, 1, space_pdf, v_max=3.9e6)
+      call initialise_particles_slowing_down(sim, 1, space_pdf, v_max=config%v_max)
 
     !> REs : Monoenergetic or Gaussian energy distribution
     case('re_gaussian')
