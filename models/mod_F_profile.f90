@@ -560,7 +560,7 @@ subroutine integrate_ffprime(write_prof)
   enddo
 
   !> write integrated profile to an outfile for diagnostic
-  if ( write_prof .eq. .true. ) then
+  if ( write_prof .eqv. .true. ) then
     open(newunit=iu, file="intg_ffprime.dat", status="replace", action="write")
     do i = 1, num_ffprime_len
       write(iu, '(2ES16.7)') num_ffprime_x(i), intg_ffprime_y0(i)
