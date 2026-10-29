@@ -19,6 +19,8 @@ use mod_vtk
 use mod_interp
 use mod_poloidal_currents
 use mod_poiss, only: Poisson
+use tr_module, only: tr_meminit
+use mod_clock, only: clck_init
 use mod_impurity, only: init_imp_adas, radiation_function, radiation_function_linear
 use mod_atomic_coeff_deuterium, only : atomic_coeff_deuterium
 use mod_openadas , only : read_adf11
@@ -531,6 +533,10 @@ call boundary_from_grid(node_list, element_list, bnd_node_list, bnd_elm_list, .f
 if (J_weak_form) then
   call MPI_Initialized(mpi_was_on, ierr)
   if (.not. mpi_was_on) call MPI_Init_thread(MPI_THREAD_FUNNELED, mpi_provided, ierr)
+  ! --- Poisson and the sparse solvers need the same setup as in jorek2_main (see mod_startup_teardown)
+  call init_threads()
+  call tr_meminit(my_id, 1)
+  call clck_init()
   i_J = (/ var_uR, var_uZ, var_uP /)
   allocate(J_node_list)
   J_node_list = node_list
