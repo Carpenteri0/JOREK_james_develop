@@ -63,6 +63,7 @@ function usage () {
   echo "  -Vfield                     Include vector of velocity field [default: off] (2D VTK ONLY)"
   echo "  -[no]psiN                   Include normalized poloidal flux or not [default: on] (2D VTK ONLY)"
   echo "  -bootstrap                  Include bootstrap current decomposition [default: off] (2D VTK ONLY)"
+  echo "  -Jweak                      Full MHD: current density from a weak-form projection, no spikes on the grid axis [default: off] (2D VTK ONLY)"
   echo "  -RphiZ_coords               (R,phi,Z) coordinate system instead of (R,Z,phi) in the VTK file"
   echo "  -5digits                    Use old 5-digit restart file index (instead of 6)"
   echo "  -proj <proj_basename>       Include particle projections. Proper basename for particle projection output file should follow (2D VTK ONLY)"
@@ -216,6 +217,7 @@ include_velocity_field="" # include vector of velocity field (or not)
 include_electric_field="" # include vector of electric field (or not)
 include_Jpol=""           # include vector of poloidal currents (or not)
 include_bootstrap=""      # include bootstrap current and averaged current
+J_weak_form=""            # current density from a weak-form projection (full MHD)
 include_projections=""    # include particle projections
 proj_basename=""          # basename for particle projection output files
 include_psi_norm=".true." # include normalized flux
@@ -329,6 +331,10 @@ while [ $# -gt 1 ]; do
     writenml="yes"
   elif [ "$1" == "-bootstrap" ]; then
     include_bootstrap=".true."
+    shift 1
+    writenml="yes"
+  elif [ "$1" == "-Jweak" ]; then
+    J_weak_form=".true."
     shift 1
     writenml="yes"
   elif [ "$1" == "-proj" ]; then
@@ -597,6 +603,9 @@ if [ "$writenml" == "yes" ]; then
   fi
   if [ ! -z "$include_bootstrap" ]; then
     echo "  include_bootstrap = $include_bootstrap" >> $vtk_nml
+  fi
+  if [ ! -z "$J_weak_form" ]; then
+    echo "  J_weak_form = $J_weak_form" >> $vtk_nml
   fi
   if [ ! -z "$include_projections" ]; then
     echo "  include_projections = $include_projections" >> $vtk_nml

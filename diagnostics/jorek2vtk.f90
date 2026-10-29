@@ -18,6 +18,7 @@ use mod_plasma_functions
 use mod_vtk
 use mod_interp
 use mod_poloidal_currents
+use mod_poiss, only: Poisson
 use mod_impurity, only: init_imp_adas, radiation_function, radiation_function_linear
 use mod_atomic_coeff_deuterium, only : atomic_coeff_deuterium
 use mod_openadas , only : read_adf11
@@ -101,6 +102,10 @@ logical               :: without_n0_mode, SI_units
 logical               :: include_fluxes, include_neo, include_gvec_field, include_magnetic_field, include_vacuum_field
 logical               :: include_velocity_field, include_bootstrap, include_psi_norm, include_electric_field, include_Jpol, RphiZ_coords
 logical               :: include_projections, include_saw_ene
+logical               :: J_weak_form, mpi_was_on
+type (type_node_list), pointer :: J_node_list           ! weak-form J_R, J_Z, J_phi, stored in the slots i_J
+integer               :: i_J(3), mpi_provided
+real*8                :: J_proj(3), R_J, Z_J
 character*80          :: proj_basename, filename_proj
 real*8                :: toroidal_angle
 
@@ -168,7 +173,7 @@ real*8  :: Rp, Zp, Rmin, Rmax, Zmin, Zmax, s_out, t_out, R_out, Z_out
 namelist /vtk_params/ nsub, i_tor, i_plane, without_n0_mode, SI_units, &
                       include_fluxes, include_neo, include_gvec_field, include_magnetic_field, include_vacuum_field,&
                       include_velocity_field, include_bootstrap, include_psi_norm, include_electric_field, include_Jpol, RphiZ_coords,&
-                      include_projections, proj_basename
+                      include_projections, proj_basename, J_weak_form
 
 
 write(*,*) '***************************************'
@@ -221,6 +226,7 @@ include_psi_norm       = .true.  ! include normalized flux
 include_projections    = .false. ! include projections from particles
 proj_basename          = 'projections' ! basename for particle projection output files
 RphiZ_coords           = .false. ! use xyz transformation (R,0,Z) instead of (R,Z,0)
+J_weak_form            = .false. ! full MHD: J from a weak-form projection (no 2nd derivatives of A, no spikes on the axis)
 
 include_radiation    = .false. 
 include_neutral_dens = .false.
@@ -265,6 +271,7 @@ write(*,*) 'include_magnetic_field =',include_magnetic_field
 write(*,*) 'include_velocity_field =',include_velocity_field
 write(*,*) 'include_electric_field =',include_electric_field
 write(*,*) 'include_Jpol      =', include_Jpol
+write(*,*) 'J_weak_form       =', J_weak_form
 write(*,*) 'include_bootstrap =', include_bootstrap
 write(*,*) 'include_psi_norm  =', include_psi_norm
 write(*,*) 'include_projections =', include_projections
@@ -516,6 +523,30 @@ xyz     = 0
 ien     = 0
 
 call boundary_from_grid(node_list, element_list, bnd_node_list, bnd_elm_list, .false.)
+
+#ifdef fullmhd
+! --- Weak-form current density: int v J dV = int B.curl(v) dV + boundary term, projected onto the finite
+! --- elements for each harmonic (Poisson, itype=5). Only first derivatives of A are needed, which avoids the
+! --- spikes that second derivatives produce at the grid axis. Stored in the velocity slots of a copy of the nodes.
+if (J_weak_form) then
+  call MPI_Initialized(mpi_was_on, ierr)
+  if (.not. mpi_was_on) call MPI_Init_thread(MPI_THREAD_FUNNELED, mpi_provided, ierr)
+  i_J = (/ var_uR, var_uZ, var_uP /)
+  allocate(J_node_list)
+  J_node_list = node_list
+  do k_tor = 1, n_tor
+    do m = 1, 3
+      do i = 1, J_node_list%n_nodes
+        J_node_list%node(i)%values(k_tor,:,i_J(m)) = 0.d0
+      enddo
+      if ( ( k_tor == 1 ) .and. ( without_n0_mode ) ) cycle
+      if (n_coord_period .ne. 1 .and. without_n0_mode .and. mod(mode(k_tor),n_coord_period) .eq. 0) cycle
+      call Poisson(my_id, 5, J_node_list, element_list, bnd_node_list, bnd_elm_list, m, i_J(m), k_tor, &
+                   ES%psi_axis, ES%psi_bnd, xpoint, xcase, ES%Z_xpoint, .false., refinement, 1)
+    enddo
+  enddo
+endif
+#endif
 
 minRad = 0.0
 if (bootstrap) then
@@ -989,6 +1020,11 @@ do i=1,element_list%n_elements
         J_R   = (R*BP_Z - BZ_p) / R
         J_Z   = (BR_p - R*BP_R - BP) / R
         J_phi = (BZ_R - BR_Z) ! defined as the physical component J_phi * e_phi, like Bp and Vp
+
+        if (J_weak_form) then ! projected current: plain values at the plane, so also valid on the grid axis
+          call interp_PRZ(J_node_list, element_list, i, i_J, 3, s, t, toroidal_angle, J_proj, R_J, Z_J)
+          J_R = J_proj(1) ; J_Z = J_proj(2) ; J_phi = J_proj(3)
+        endif
 
         JxB_R      = J_Z  *BP - J_phi*BZ
         JxB_Z      = J_phi*BR - J_R  *BP
@@ -1964,6 +2000,12 @@ else
 endif
 
 call write_vtk('jorek_tmp.vtk',xyz,ien,etype,scalar_names,scalars,vector_names,vectors, time_vtk)
+
+#ifdef fullmhd
+if (J_weak_form) then
+  if (.not. mpi_was_on) call MPI_Finalize(ierr)
+endif
+#endif
 
 write(*,*) 'done.'
 

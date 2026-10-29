@@ -41,6 +41,8 @@ integer,                  intent(in)    :: itype             ! selects the physi
                                                              ! +1 or +3: Poisson
                                                              ! +4: Poisson 3D
                                                              ! 0: variable projection
+                                                             ! 5: weak-form projection of the current density
+                                                             !    component ivar_in of harmonic i_harm (full MHD)
 type (type_node_list),    intent(inout) :: node_list
 type (type_element_list), intent(inout) :: element_list
 integer,                  intent(in)    :: ivar_in           ! index of the input variable
@@ -132,7 +134,7 @@ if (my_id == 0) then
   call tr_debug_write("Deb_poisson",nz_AA)
 
   n_border = 0
-  if (itype .ne. 0) then
+  if ((itype .ne. 0) .and. (itype .ne. 5)) then
     do i=1,node_list%n_nodes
       if (treat_axis) then
         ! --- Only one fixed for fixed-axis (only valid for G1-cases at the moment!!!)
@@ -170,7 +172,7 @@ if (my_id == 0) then
     enddo
   endif
 
-  if (.not. use_pastix_eq .and. (itype .eq. 0 .and. ivar_out .eq. 710)) then
+  if (.not. use_pastix_eq .and. ((itype .eq. 0 .and. ivar_out .eq. 710) .or. (itype .eq. 5))) then
     do i=1,node_list%n_nodes
       if(treat_axis)then
         ! --- Only one fixed for fixed-axis (only valid for G1-cases at the moment!!!)
@@ -313,7 +315,7 @@ if (my_id == 0) then
 
       call element_matrix_poisson3d(itype, element, nodes, ivar_in, ivar_out, i_harm, ELM, RHS)
 
-    elseif (itype .eq. 0) then
+    elseif ((itype .eq. 0) .or. (itype .eq. 5)) then
   
       call element_matrix_projection(itype,element,nodes,ivar_in,ivar_out,i_harm,ELM,RHS)
   
@@ -581,7 +583,7 @@ elseif (itype .eq. 4) then
   stop
 #endif
 
-elseif (.not. use_pastix_eq .and. (itype .eq. 0 .and. ivar_out .eq. 710)) then
+elseif (.not. use_pastix_eq .and. ((itype .eq. 0 .and. ivar_out .eq. 710) .or. (itype .eq. 5))) then
   if (my_id == 0 ) then
 
     ! --- calculate node_indices
@@ -621,7 +623,7 @@ elseif (.not. use_pastix_eq .and. (itype .eq. 0 .and. ivar_out .eq. 710)) then
     a_mat%nnz = nz_AA
   endif
 
-elseif (itype .ne. 0) then        ! apply fixed boundary conditions (not for variable projection)
+elseif ((itype .ne. 0) .and. (itype .ne. 5)) then        ! apply fixed boundary conditions (not for projections)
   if (my_id == 0 ) then
 
     ! --- calculate node_indices
@@ -795,6 +797,8 @@ if (my_id == 0) then
           else
             node_list%node(i)%values(1,k,ivar_out) = node_list%node(i)%values(1,k,ivar_out) + (1.d0 - amix_used) * rhs_vec%val(index)
           endif
+        elseif (itype .eq. 5) then
+          node_list%node(i)%values(i_harm,k,ivar_out) = node_list%node(i)%values(i_harm,k,ivar_out) + rhs_vec%val(index)
         !--------------- for equation on total flux
         else if (itype .eq. 4) then
 #if (!defined(USE_DOMM) && !defined(USE_EXT_FIELD) && STELLARATOR_MODEL)
